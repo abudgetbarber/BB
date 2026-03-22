@@ -62,52 +62,74 @@ input::placeholder{color:#AAAAAA}
     <div id="restore-status" style="font-size:11px;color:#767668;margin-top:8px;min-height:16px;text-align:center"></div>
   </div>
 
+  <div id="debugLog" style="display:none;background:#f8f8f4;border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:12px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:11px;text-align:left"></div>
   <button class="btn btn-primary" id="loginBtn" onclick="fetchLatestAndLogin(doLogin)">Login →</button>
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
 <script>
-
 var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ── Step 1: On page load, always fetch latest staff/customers from Sheets ──
-// This runs immediately so data is ready by the time user types their PIN
-var _dataReady = false;
-var _fetchDone = false;
+function log(msg, color) {
+  var el = document.getElementById('debugLog');
+  if(!el) return;
+  var line = document.createElement('div');
+  line.style.color = color || '#333';
+  line.style.fontSize = '11px';
+  line.style.marginBottom = '2px';
+  line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+  el.appendChild(line);
+  el.style.display = 'block';
+}
+
+// Step 1: Fetch from Sheets on page load
+log('Page loaded. Starting Sheets fetch...', '#003D2B');
+
+var _staffLoaded = false;
 
 (function loadFromSheets(){
   var cbName = '_ls' + Date.now();
   var s = document.createElement('script');
   var done = false;
 
+  log('Sending request to: ' + SHEET_URL.slice(0,60) + '...', '#555');
+
   var timer = setTimeout(function(){
     if(done) return; done = true;
-    _fetchDone = true;
+    _staffLoaded = false;
     delete window[cbName];
     if(s.parentNode) document.head.removeChild(s);
-    setStatus('⚠ Could not reach server — login with cached data if available', 'warn');
+    log('❌ TIMEOUT after 15s — Apps Script did not respond', 'red');
+    log('Check: Is Apps Script deployed? Is URL correct?', 'red');
     enableLogin();
   }, 15000);
 
   window[cbName] = function(json){
     if(done) return; done = true;
     clearTimeout(timer);
-    _fetchDone = true;
     delete window[cbName];
     if(s.parentNode) document.head.removeChild(s);
+    log('✅ Got response from Sheets', 'green');
+    log('ok=' + json.ok + ' hasData=' + !!(json.data), '#333');
     try{
       if(json && json.ok && json.data){
         var d = json.data;
-        if(d.staff     && d.staff.length)     localStorage.setItem('bb_staff',     JSON.stringify(d.staff));
-        if(d.customers && d.customers.length)  localStorage.setItem('bb_customers', JSON.stringify(d.customers));
-        if(d.salons    && d.salons.length)     localStorage.setItem('bb_salons',    JSON.stringify(d.salons));
+        var staffCount = d.staff ? d.staff.length : 0;
+        log('Staff records: ' + staffCount, staffCount > 0 ? 'green' : 'orange');
+        if(staffCount > 0){
+          localStorage.setItem('bb_staff', JSON.stringify(d.staff));
+          log('Staff saved to localStorage ✅', 'green');
+        } else {
+          log('⚠ Staff sheet is empty in Google Sheets', 'orange');
+        }
+        if(d.customers && d.customers.length) localStorage.setItem('bb_customers', JSON.stringify(d.customers));
+        if(d.salons    && d.salons.length)    localStorage.setItem('bb_salons',    JSON.stringify(d.salons));
         localStorage.setItem('bb_sheetUrl', SHEET_URL);
-        _dataReady = true;
-        setStatus('', '');
+        _staffLoaded = staffCount > 0;
       } else {
-        setStatus('⚠ Sheets returned no data — using cached data', 'warn');
+        log('❌ Response missing ok/data: ' + JSON.stringify(json).slice(0,100), 'red');
       }
-    }catch(e){
-      setStatus('⚠ Error loading data: ' + e.message, 'warn');
+    } catch(e) {
+      log('❌ Error processing response: ' + e.message, 'red');
     }
     enableLogin();
   };
@@ -115,18 +137,18 @@ var _fetchDone = false;
   s.onerror = function(){
     if(done) return; done = true;
     clearTimeout(timer);
-    _fetchDone = true;
     delete window[cbName];
     if(s.parentNode) document.head.removeChild(s);
-    setStatus('⚠ Network error — login with cached data if available', 'warn');
+    log('❌ NETWORK ERROR — script tag failed to load', 'red');
+    log('URL tried: ' + s.src.slice(0,80), 'red');
     enableLogin();
   };
 
   s.src = SHEET_URL + '?action=read&callback=' + cbName;
+  log('Script tag src set. Waiting for response...', '#555');
   document.head.appendChild(s);
 
-  // Disable login button while fetching
-  disableLogin('⏳ Loading staff data…');
+  disableLogin('⏳ Loading…');
 })();
 
 function disableLogin(msg){
@@ -137,32 +159,42 @@ function disableLogin(msg){
 function enableLogin(){
   var btn = document.getElementById('loginBtn');
   if(btn){ btn.disabled = false; btn.textContent = 'Login →'; }
+  var cached = JSON.parse(localStorage.getItem('bb_staff') || '[]');
+  log('localStorage bb_staff count: ' + cached.length, cached.length > 0 ? 'green' : 'orange');
 }
 
-function setStatus(msg, type){
-  var el = document.getElementById('fetchStatus');
-  if(!el) return;
-  if(!msg){ el.style.display = 'none'; return; }
-  el.style.display = 'block';
-  el.style.color = type === 'warn' ? '#DC2626' : '#003D2B';
-  el.textContent = msg;
-}
-
-// ── Step 2: Login check ──
 function doLogin(){
   var phone = document.getElementById('phoneInput').value.trim();
   var pin   = document.getElementById('pinInput').value.trim();
   var errEl = document.getElementById('errMsg');
+
+  log('Login attempt — phone: ' + phone.slice(0,4) + '****  pin: ****', '#333');
 
   if(phone.length < 8){ errEl.textContent='Enter a valid phone number'; errEl.style.display='block'; return; }
   if(pin.length < 4){   errEl.textContent='Enter your 4-digit PIN';    errEl.style.display='block'; return; }
 
   errEl.style.display = 'none';
 
-    var staffList = JSON.parse(localStorage.getItem('bb_staff')) || [];
+  var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
+  log('Checking against ' + staffList.length + ' staff records', '#333');
+
   var sm = staffList.find(function(u){ return u.phone===phone && u.role==='barber'; });
-  if(!sm){ errEl.textContent='Phone not registered as Barber — check with admin'; errEl.style.display='block'; return; }
-  if(!sm.loginOtp || sm.loginOtp !== pin){ errEl.textContent='Wrong PIN. Try again.'; errEl.style.display='block'; document.getElementById('pinInput').value=''; return; }
+  if(!sm){
+    log('❌ No barber found with phone: ' + phone, 'red');
+    log('Available phones: ' + staffList.map(function(u){return u.phone;}).join(', '), 'orange');
+    errEl.textContent='Phone not registered as Barber';
+    errEl.style.display='block';
+    return;
+  }
+  log('Found: ' + sm.name + ' role=' + sm.role, 'green');
+  if(!sm.loginOtp || sm.loginOtp !== pin){
+    log('❌ PIN mismatch. Stored PIN: ' + sm.loginOtp + ' Entered: ' + pin, 'red');
+    errEl.textContent='Wrong PIN. Try again.';
+    errEl.style.display='block';
+    document.getElementById('pinInput').value='';
+    return;
+  }
+  log('✅ Login success! Redirecting...', 'green');
   sessionStorage.setItem('bb_role','barber');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', sm.name||'Barber');
@@ -172,7 +204,6 @@ function doLogin(){
 document.addEventListener('keydown', function(e){
   if(e.key === 'Enter' && !document.getElementById('loginBtn').disabled) doLogin();
 });
-
 </script>
 </body>
 </html>
