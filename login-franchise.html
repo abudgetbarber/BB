@@ -77,7 +77,7 @@ input::placeholder{color:#AAAAAA}
 // Auto-fetch latest data from Google Sheets before login check
 // This ensures PINs are always current from any device
 function fetchLatestAndLogin(loginFn) {
-  var url = localStorage.getItem('bb_sheetUrl');
+  var url = localStorage.getItem('bb_sheetUrl') || 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
   if (!url) { loginFn(); return; }
   
   var cbName = '_bbLogin' + Date.now();
