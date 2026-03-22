@@ -1277,7 +1277,7 @@ function saveEditStaff(){
   staff[idx].phone        =newPhone;
   staff[idx].role         =document.getElementById('est-role').value;
   staff[idx].salonId      =document.getElementById('est-salon').value||null;
-  staff[idx].loginPin     =newPin||staff[idx].loginPin;
+  staff[idx].loginPin     =newPin||staff[idx].loginPin.value.trim();
   staff[idx].fixedSalary  =parseFloat(document.getElementById('est-salary').value)||0;
   staff[idx].foodMoney    =parseFloat(document.getElementById('est-food').value)||0;
   staff[idx].cleaningMoney=parseFloat(document.getElementById('est-clean').value)||0;
