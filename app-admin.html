@@ -1511,8 +1511,7 @@ async function syncAllData(){
     syncSheet(url,name,rows,function(ok){if(!ok)errors++;next();});
   }
   next();
-}
-  
+}  
 function applyRestoredData(d){
   var toStr=function(rec,fields){
     if(!rec)return rec;
