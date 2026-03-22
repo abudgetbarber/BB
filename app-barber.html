@@ -682,43 +682,97 @@ body{font-family:var(--BF);background:var(--bg);color:var(--white);font-size:15p
 
 var BB_SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ── DIRECT SHEETS WRITE (single row) ──
+// ── DIRECT SHEETS WRITE — JSONP GET (reliable on all browsers/devices) ──
+// fetch+no-cors drops the body on Google's redirect, so we use script tags instead
+
 function appendRowToSheet(sheetName, rowObj, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
   if(!url){ if(onDone)onDone(false); return; }
-  fetch(url,{
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'appendRow',sheet:sheetName,data:rowObj})
-  }).then(function(){ if(onDone)onDone(true); })
-    .catch(function(e){ console.warn('appendRow failed:',e); if(onDone)onDone(false); });
+  var payload={action:'appendRow',sheet:sheetName,data:rowObj};
+  var cbName='_bbA'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
 
-// ── UPDATE existing row by id ──
 function updateRowInSheet(sheetName, rowObj, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
   if(!url){ if(onDone)onDone(false); return; }
-  fetch(url,{
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'updateRow',sheet:sheetName,data:rowObj,idField:'id'})
-  }).then(function(){ if(onDone)onDone(true); })
-    .catch(function(e){ console.warn('updateRow failed:',e); if(onDone)onDone(false); });
+  var payload={action:'updateRow',sheet:sheetName,data:rowObj,idField:'id'};
+  var cbName='_bbU'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
 
-// ── DELETE row by id ──
 function deleteRowFromSheet(sheetName, id, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
   if(!url){ if(onDone)onDone(false); return; }
-  fetch(url,{
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'deleteRow',sheet:sheetName,id:id,idField:'id'})
-  }).then(function(){ if(onDone)onDone(true); })
-    .catch(function(e){ console.warn('deleteRow failed:',e); if(onDone)onDone(false); });
+  var payload={action:'deleteRow',sheet:sheetName,id:id,idField:'id'};
+  var cbName='_bbD'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
 
 // ── FETCH rows from one sheet with optional filters ──
@@ -993,11 +1047,7 @@ function addBill(){
   entries.push(entry);
   LS.set('entries',entries); // cache locally
   appendRowToSheet('Entries',entry,function(ok){if(!ok)toast('⚠ Saved locally — will sync');});
-  showSyncPill();
-  sheetAppend('Entries',entry,function(ok){
-    hideSyncPill();
-    if(!ok) toast('⚠ Bill saved locally — will sync when connected');
-  });
+
   selectedSvcs=[];
   document.getElementById('inp-ph').value='';
   document.getElementById('inp-cash').value='';
@@ -1025,7 +1075,6 @@ function addCashIn(){
   log.push({amount:amt,time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),date:today(),barberId:ME.id});
   LS.set('cashIn',log);
   appendRowToSheet('CashIn',log[log.length-1],function(ok){if(!ok)toast('⚠ Saved locally');});
-  sheetAppend('CashIn',log[log.length-1]);
   document.getElementById('ci-inp').value='';
   renderCashInCounter();
   toast('💵 Cash-in ₹'+amt+' recorded');
@@ -1050,7 +1099,6 @@ function addExpense(){
   log.push({desc:desc,amount:amt,time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),date:today(),barberId:ME.id});
   LS.set('expenses',log);
   appendRowToSheet('Expenses',log[log.length-1],function(ok){if(!ok)toast('⚠ Saved locally');});
-  sheetAppend('Expenses',log[log.length-1]);
   document.getElementById('exp-desc').value='';
   document.getElementById('exp-amt').value='';
   renderExpenseCounter();
@@ -1424,7 +1472,6 @@ function recordAtt(type){
   log.push({type:type,date:today(),time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),ts:Date.now(),barberId:ME.id});
   LS.set('attendance',log);
   appendRowToSheet('Attendance',log[log.length-1],function(ok){if(!ok)toast('⚠ Attendance saved locally');});
-  sheetAppend('Attendance',log[log.length-1]);
   toast(type==='in'?'✅ Clocked In!':'✅ Clocked Out!');
   renderAttBtnWrap();
   renderAttBtnWrapBilling();
@@ -1551,7 +1598,6 @@ function addAdvance(){
   log.push({date:isoToLocal(d),amount:amt,barberId:ME.id,ts:Date.now()});
   LS.set('advances',log);
   appendRowToSheet('Advances',log[log.length-1],function(ok){if(!ok)toast('⚠ Saved locally');});
-  sheetAppend('Advances',log[log.length-1]);
   document.getElementById('adv-amt').value='';
   renderAdvanceLog();
   toast('💳 Advance ₹'+amt+' recorded');

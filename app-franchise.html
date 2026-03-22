@@ -474,30 +474,97 @@ body{font-family:var(--BF);background:var(--bg);color:var(--white);font-size:15p
 <script>
 var BB_SHEET_URL='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ── DIRECT SHEETS HELPERS ──
-function appendRowToSheet(sheetName,rowObj,onDone){
+// ── DIRECT SHEETS WRITE — JSONP GET (reliable on all browsers/devices) ──
+// fetch+no-cors drops the body on Google's redirect, so we use script tags instead
+
+function appendRowToSheet(sheetName, rowObj, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url){if(onDone)onDone(false);return;}
-  fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'appendRow',sheet:sheetName,data:rowObj})})
-  .then(function(){if(onDone)onDone(true);})
-  .catch(function(e){console.warn('appendRow:',e);if(onDone)onDone(false);});
+  if(!url){ if(onDone)onDone(false); return; }
+  var payload={action:'appendRow',sheet:sheetName,data:rowObj};
+  var cbName='_bbA'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
-function updateRowInSheet(sheetName,rowObj,onDone){
+
+function updateRowInSheet(sheetName, rowObj, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url){if(onDone)onDone(false);return;}
-  fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'updateRow',sheet:sheetName,data:rowObj,idField:'id'})})
-  .then(function(){if(onDone)onDone(true);})
-  .catch(function(e){console.warn('updateRow:',e);if(onDone)onDone(false);});
+  if(!url){ if(onDone)onDone(false); return; }
+  var payload={action:'updateRow',sheet:sheetName,data:rowObj,idField:'id'};
+  var cbName='_bbU'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
-function deleteRowFromSheet(sheetName,id,onDone){
+
+function deleteRowFromSheet(sheetName, id, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url){if(onDone)onDone(false);return;}
-  fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'deleteRow',sheet:sheetName,id:id,idField:'id'})})
-  .then(function(){if(onDone)onDone(true);})
-  .catch(function(e){console.warn('deleteRow:',e);if(onDone)onDone(false);});
+  if(!url){ if(onDone)onDone(false); return; }
+  var payload={action:'deleteRow',sheet:sheetName,id:id,idField:'id'};
+  var cbName='_bbD'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
 function fetchSheetRows(sheetName,filters,onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;

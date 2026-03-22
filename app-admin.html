@@ -275,9 +275,9 @@ pre{font-size:11px;color:#90EE90;line-height:1.6;white-space:pre-wrap;word-break
     </div>
     <details>
       <summary style="color:var(--muted);font-size:12px;cursor:pointer">📋 View Apps Script code to paste</summary>
-      <pre id="gs-code" style="margin-top:10px">// ── BUDGET BARBER APPS SCRIPT v8 ──
-// Handles: appendRow, updateRow, deleteRow, getRows (new)
-//           + full syncSheet replace/append + read all (existing)
+      <pre id="gs-code" style="margin-top:10px">// ── BUDGET BARBER APPS SCRIPT v9 ──
+// Handles single-row writes via JSONP GET (appendRow, updateRow, deleteRow)
+// and full restore via JSONP GET (read all sheets)
 //
 // SETUP:
 // 1. Google Sheets → Extensions → Apps Script → delete all → paste this → Save
@@ -306,68 +306,63 @@ const HEADERS = {
   AttOverrides: ['staffId','month','present','half','absent']
 };
 
-// ── POST handler ──
-function doPost(e) {
-  try {
-    var body = JSON.parse(e.postData.contents);
-    var action = body.action || '';
-
-    if (action === 'appendRow') {
-      appendOneRow(body.sheet, body.data);
-      return jsonOut({ ok: true }, '');
-    }
-    if (action === 'updateRow') {
-      updateOneRow(body.sheet, body.data, body.idField || 'id');
-      return jsonOut({ ok: true }, '');
-    }
-    if (action === 'deleteRow') {
-      deleteOneRow(body.sheet, body.id, body.idField || 'id');
-      return jsonOut({ ok: true }, '');
-    }
-    if (action === 'syncSheet') {
-      if (body.replace === 1 || body.replace === '1' || body.replace === true) {
-        writeSheet(body.sheet, body.data || []);
-      } else {
-        appendRows(body.sheet, body.data || []);
-      }
-      return jsonOut({ ok: true }, '');
-    }
-    return jsonOut({ ok: true, message: 'no-op' }, '');
-  } catch(err) {
-    return jsonOut({ ok: false, error: err.message }, '');
-  }
-}
-
-// ── GET handler ──
+// ── ALL requests come in as GET (JSONP) ──
 function doGet(e) {
-  var p = e.parameter || {};
-  var callback = p.callback || '';
-  var action   = p.action   || 'read';
+  var p        = e.parameter || {};
+  var callback = p.callback  || '';
 
   try {
-    // NEW: fetch rows from one sheet with optional filters
-    if (action === 'getRows') {
-      var sheetName = p.sheet || '';
-      var rows = readSheet(sheetName);
-      // Apply filters — any extra param besides action/sheet/callback is a filter
-      var filterKeys = Object.keys(p).filter(function(k){ return k!=='action'&&k!=='sheet'&&k!=='callback'; });
-      if (filterKeys.length) {
-        rows = rows.filter(function(row){
-          return filterKeys.every(function(k){ return String(row[k]) === String(p[k]); });
-        });
+    // ── Single-row write via ?payload=JSON&callback=fn ──
+    if (p.payload) {
+      var body     = JSON.parse(decodeURIComponent(p.payload));
+      var action   = body.action || '';
+
+      if (action === 'appendRow') {
+        appendOneRow(body.sheet, body.data);
+        return jsonOut({ ok: true }, callback);
       }
-      return jsonOut({ ok: true, rows: rows }, callback);
+      if (action === 'updateRow') {
+        updateOneRow(body.sheet, body.data, body.idField || 'id');
+        return jsonOut({ ok: true }, callback);
+      }
+      if (action === 'deleteRow') {
+        deleteOneRow(body.sheet, body.id, body.idField || 'id');
+        return jsonOut({ ok: true }, callback);
+      }
+      if (action === 'syncSheet') {
+        var rows = body.data || [];
+        if (body.replace === 1 || body.replace === '1' || body.replace === true) {
+          writeSheet(body.sheet, rows);
+        } else {
+          appendRows(body.sheet, rows);
+        }
+        return jsonOut({ ok: true }, callback);
+      }
     }
 
-    // Fallback GET sync (small datasets)
-    if (action === 'syncSheet') {
+    // ── Old-style GET sync (action=syncSheet in params) ──
+    if (p.action === 'syncSheet') {
       var rows2 = JSON.parse(decodeURIComponent(p.data || '[]'));
       if (p.replace === '1') writeSheet(p.sheet, rows2);
       else appendRows(p.sheet, rows2);
       return jsonOut({ ok: true }, callback);
     }
 
-    // Default: read ALL sheets (for Restore)
+    // ── Read all sheets (Restore) ──
+    if (p.action === 'getRows') {
+      var rows3 = readSheet(p.sheet || '');
+      var filterKeys = Object.keys(p).filter(function(k){
+        return k !== 'action' && k !== 'sheet' && k !== 'callback' && k !== 'payload';
+      });
+      if (filterKeys.length) {
+        rows3 = rows3.filter(function(row){
+          return filterKeys.every(function(k){ return String(row[k]) === String(p[k]); });
+        });
+      }
+      return jsonOut({ ok: true, rows: rows3 }, callback);
+    }
+
+    // Default: read ALL sheets for full Restore
     var result = {};
     Object.keys(HEADERS).forEach(function(name) {
       result[name.charAt(0).toLowerCase() + name.slice(1)] = readSheet(name);
@@ -379,12 +374,28 @@ function doGet(e) {
   }
 }
 
-// ── Append one row to sheet ──
+// ── doPost kept for backward compatibility ──
+function doPost(e) {
+  try {
+    var body   = JSON.parse(e.postData.contents);
+    var action = body.action || '';
+    if (action === 'appendRow')  { appendOneRow(body.sheet, body.data); return jsonOut({ok:true},''); }
+    if (action === 'updateRow')  { updateOneRow(body.sheet, body.data, body.idField||'id'); return jsonOut({ok:true},''); }
+    if (action === 'deleteRow')  { deleteOneRow(body.sheet, body.id, body.idField||'id'); return jsonOut({ok:true},''); }
+    if (action === 'syncSheet')  {
+      if (body.replace===1||body.replace==='1'||body.replace===true) writeSheet(body.sheet,body.data||[]);
+      else appendRows(body.sheet,body.data||[]);
+      return jsonOut({ok:true},'');
+    }
+    return jsonOut({ok:true,message:'no-op'},'');
+  } catch(err) { return jsonOut({ok:false,error:err.message},''); }
+}
+
 function appendOneRow(sheetName, rowObj) {
   if (!sheetName || !rowObj) return;
-  var sheet = getOrCreateSheet(sheetName);
+  var sheet   = getOrCreateSheet(sheetName);
   var headers = HEADERS[sheetName] || Object.keys(rowObj);
-  var vals = headers.map(function(k) {
+  var vals    = headers.map(function(k) {
     var v = rowObj[k];
     if (v === null || v === undefined || v === '') return '';
     return typeof v === 'object' ? JSON.stringify(v) : v;
@@ -392,15 +403,14 @@ function appendOneRow(sheetName, rowObj) {
   sheet.appendRow(vals);
 }
 
-// ── Update one row by id field ──
 function updateOneRow(sheetName, rowObj, idField) {
   if (!sheetName || !rowObj) return;
   var sheet = getOrCreateSheet(sheetName);
-  if (sheet.getLastRow() < 2) return;
-  var data = sheet.getDataRange().getValues();
+  if (sheet.getLastRow() < 2) { appendOneRow(sheetName, rowObj); return; }
+  var data    = sheet.getDataRange().getValues();
   var headers = data[0];
-  var idCol = headers.indexOf(idField);
-  if (idCol === -1) return;
+  var idCol   = headers.indexOf(idField);
+  if (idCol === -1) { appendOneRow(sheetName, rowObj); return; }
   var targetId = String(rowObj[idField]);
   for (var r = 1; r < data.length; r++) {
     if (String(data[r][idCol]) === targetId) {
@@ -413,28 +423,22 @@ function updateOneRow(sheetName, rowObj, idField) {
       return;
     }
   }
-  // If not found, append
-  appendOneRow(sheetName, rowObj);
+  appendOneRow(sheetName, rowObj);  // not found → append
 }
 
-// ── Delete one row by id field ──
 function deleteOneRow(sheetName, id, idField) {
   if (!sheetName || !id) return;
   var sheet = getOrCreateSheet(sheetName);
   if (sheet.getLastRow() < 2) return;
-  var data = sheet.getDataRange().getValues();
+  var data    = sheet.getDataRange().getValues();
   var headers = data[0];
-  var idCol = headers.indexOf(idField);
+  var idCol   = headers.indexOf(idField);
   if (idCol === -1) return;
   for (var r = data.length - 1; r >= 1; r--) {
-    if (String(data[r][idCol]) === String(id)) {
-      sheet.deleteRow(r + 1);
-      return;
-    }
+    if (String(data[r][idCol]) === String(id)) { sheet.deleteRow(r + 1); return; }
   }
 }
 
-// ── Write full sheet (replace) ──
 function writeSheet(name, rows) {
   var sheet = getOrCreateSheet(name);
   ensureHeaders(sheet, name);
@@ -443,17 +447,15 @@ function writeSheet(name, rows) {
   if (rows && rows.length) writeRowsToSheet(sheet, name, rows, 2);
 }
 
-// ── Append multiple rows ──
 function appendRows(name, rows) {
   if (!rows || !rows.length) return;
   var sheet = getOrCreateSheet(name);
-  if (!sheet || sheet.getLastRow() < 1) ensureHeaders(sheet, name);
   writeRowsToSheet(sheet, name, rows, sheet.getLastRow() + 1);
 }
 
 function writeRowsToSheet(sheet, name, rows, startRow) {
   var headers = HEADERS[name] || Object.keys(rows[0]);
-  var data = rows.map(function(row) {
+  var data    = rows.map(function(row) {
     return headers.map(function(k) {
       var v = row[k];
       if (v === null || v === undefined || v === '') return '';
@@ -463,27 +465,23 @@ function writeRowsToSheet(sheet, name, rows, startRow) {
   if (data.length) sheet.getRange(startRow, 1, data.length, headers.length).setValues(data);
 }
 
-// ── Read sheet → array of objects ──
 function readSheet(name) {
   var sheet = SS.getSheetByName(name);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  var values = sheet.getDataRange().getValues();
+  var values  = sheet.getDataRange().getValues();
   var headers = values[0];
-  return values.slice(1).filter(function(row) {
-    return !row.every(function(c) { return c === ''; });
-  }).map(function(row) {
-    var obj = {};
-    headers.forEach(function(h, i) { obj[String(h)] = row[i]; });
-    return obj;
-  });
+  return values.slice(1)
+    .filter(function(row){ return !row.every(function(c){ return c === ''; }); })
+    .map(function(row){
+      var obj = {};
+      headers.forEach(function(h, i){ obj[String(h)] = row[i]; });
+      return obj;
+    });
 }
 
 function getOrCreateSheet(name) {
   var sheet = SS.getSheetByName(name);
-  if (!sheet) {
-    sheet = SS.insertSheet(name);
-    ensureHeaders(sheet, name);
-  }
+  if (!sheet) { sheet = SS.insertSheet(name); ensureHeaders(sheet, name); }
   return sheet;
 }
 
@@ -676,30 +674,97 @@ function jsonOut(obj, callback) {
 <script>
 var BB_SHEET_URL='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ── DIRECT SHEETS HELPERS ──
-function appendRowToSheet(sheetName,rowObj,onDone){
+// ── DIRECT SHEETS WRITE — JSONP GET (reliable on all browsers/devices) ──
+// fetch+no-cors drops the body on Google's redirect, so we use script tags instead
+
+function appendRowToSheet(sheetName, rowObj, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url){if(onDone)onDone(false);return;}
-  fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'appendRow',sheet:sheetName,data:rowObj})})
-  .then(function(){if(onDone)onDone(true);})
-  .catch(function(e){console.warn('appendRow:',e);if(onDone)onDone(false);});
+  if(!url){ if(onDone)onDone(false); return; }
+  var payload={action:'appendRow',sheet:sheetName,data:rowObj};
+  var cbName='_bbA'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
-function updateRowInSheet(sheetName,rowObj,onDone){
+
+function updateRowInSheet(sheetName, rowObj, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url){if(onDone)onDone(false);return;}
-  fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'updateRow',sheet:sheetName,data:rowObj,idField:'id'})})
-  .then(function(){if(onDone)onDone(true);})
-  .catch(function(e){console.warn('updateRow:',e);if(onDone)onDone(false);});
+  if(!url){ if(onDone)onDone(false); return; }
+  var payload={action:'updateRow',sheet:sheetName,data:rowObj,idField:'id'};
+  var cbName='_bbU'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
-function deleteRowFromSheet(sheetName,id,onDone){
+
+function deleteRowFromSheet(sheetName, id, onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url){if(onDone)onDone(false);return;}
-  fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({action:'deleteRow',sheet:sheetName,id:id,idField:'id'})})
-  .then(function(){if(onDone)onDone(true);})
-  .catch(function(e){console.warn('deleteRow:',e);if(onDone)onDone(false);});
+  if(!url){ if(onDone)onDone(false); return; }
+  var payload={action:'deleteRow',sheet:sheetName,id:id,idField:'id'};
+  var cbName='_bbD'+Date.now();
+  var script=document.createElement('script');
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done)return; done=true;
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  },15000);
+  window[cbName]=function(res){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    delete window[cbName];
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(!!(res&&res.ok));
+  };
+  script.onerror=function(){
+    if(done)return; done=true;
+    clearTimeout(timer);
+    if(script.parentNode)document.head.removeChild(script);
+    if(onDone)onDone(false);
+  };
+  script.src=url+'?payload='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName;
+  document.head.appendChild(script);
 }
 function fetchSheetRows(sheetName,filters,onDone){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
