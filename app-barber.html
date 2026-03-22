@@ -293,26 +293,6 @@ body{font-family:var(--BF);background:var(--bg);color:var(--white);font-size:15p
 </style>
 </head>
 <body>
-<div id="restoreBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#003D2B;color:#F5E030;padding:12px 16px;align-items:center;justify-content:center;gap:10px;font-family:var(--BF);font-size:13px;font-weight:700">
-  <span style="animation:spin 1s linear infinite;display:inline-block">⟳</span>
-  Loading your salon data from Google Sheets…
-</div>
-<!-- SETUP BANNER (shown when localStorage is empty / no staff record found) -->
-<div id="setup-banner" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
-  <div class="sb-logo"><span class="sb-logo-text">BB</span></div>
-  <div class="sb-title">Device Setup Required</div>
-  <div class="sb-sub">This device doesn't have salon data yet.<br>Paste your Google Sheets sync URL below and tap Restore to get all data.</div>
-  <div class="sb-card">
-    <div class="sb-url-label">Google Sheets Sync URL</div>
-    <input type="url" class="sb-url-input" id="sb-url-input" placeholder="https://script.google.com/macros/s/...">
-    <button class="sb-btn-restore" onclick="sbRestore()">⬇ Restore All Data</button>
-    <button class="sb-btn-skip" onclick="sbSkip()">Skip — I'll set up later</button>
-    <div class="sb-status" id="sb-status"></div>
-  </div>
-  <div style="font-size:11px;color:var(--muted2);margin-top:8px">Ask your Admin for the Google Sheets URL</div>
-</div>
-
-
 <div id="app-content">
 <div class="topbar">
   <div class="logo"><span>BB</span></div>
@@ -827,9 +807,6 @@ var SERVICES_LIST = [
   {code:'HS', label:'Hair Styling'}
 ];
 var selectedSvcs = [];
-
-// Ensure Sheet URL is always configured
-(function(){var U='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';if(!localStorage.getItem('bb_sheetUrl')&&U)localStorage.setItem('bb_sheetUrl',U);if(!LS.get('sheetUrl')&&U)LS.set('sheetUrl',U);})();
 // ── HELPERS ──
 function today()    { return new Date().toLocaleDateString('en-IN'); }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
@@ -867,40 +844,6 @@ function svcIcon(services) {
   if (s.includes('combo')) return '✂️💈';
   return '✂️';
 }
-
-// ── AUTO-RESTORE on first load ──
-// If this device has no staff data but has a Sheet URL, pull from Sheets automatically
-// ── AUTO-LOAD DATA ON FIRST OPEN ──
-// Runs every time the app loads. If staff data is missing or stale,
-// silently pulls latest from Google Sheets — no manual action needed.
-(function autoLoad(){
-  var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url)return;
-
-  // Always check Sheets on load — show banner briefly while loading
-  var staff=LS.get('staff')||[];
-  var banner=document.getElementById('restoreBanner');
-
-  // If no data at all — must load from Sheets before proceeding
-  if(!staff.length){
-    if(banner)banner.style.display='flex';
-    fetchFromSheets(url,
-      function(data){
-        applyRestoredData(data);
-        if(banner)banner.style.display='none';
-        // Reload so the app initialises with the fresh data
-        location.reload();
-      },
-      function(err){
-        if(banner)banner.style.display='none';
-        console.warn('Auto-load failed:',err);
-        // Let the app continue — user can restore manually
-      }
-    );
-  }
-})();
-
-
 // ── INIT ──
 var ME = null;
 (function(){
@@ -1668,136 +1611,6 @@ function renderSalary(){
     '<div class="salary-row deduct"><span class="salary-lbl">Deductions (by Manager)</span><span class="salary-val">− '+fmtINR(totalDed)+'</span></div>'+
     '<div class="salary-row net"><span class="salary-lbl">Net Salary</span><span class="salary-val">'+fmtINR(net)+'</span></div>'+
     (fixedSalary===0?'<div style="font-size:11px;color:var(--warn);margin-top:8px">⚠ Fixed salary not set — contact your manager to update your profile.</div>':'');
-}
-
-// ── SHEETS ──
-// ── GOOGLE SHEETS SYNC (CORS-safe) ──
-// Uses hidden form POST for writes, script-tag JSONP for reads
-
-// ── GOOGLE SHEETS SYNC ──
-// Write: fetch no-cors (works on all devices - data sent, response not readable - that's OK)
-// Read:  JSONP script tag (works on all devices)
-
-// ── GOOGLE SHEETS SYNC ──
-// Uses GET requests (works on ALL devices — no CORS issues)
-// Data is chunked to stay under URL length limits
-
-// ── GOOGLE SHEETS SYNC (mobile-safe) ──
-// WRITE: fetch POST no-cors with JSON body — works on ALL devices
-// READ:  JSONP script tag — works on ALL devices
-
-function saveSheetConfig(){
-  var u=document.getElementById('sh-url').value.trim();
-  var n=document.getElementById('sh-name').value.trim()||'Sheet1';
-  LS.set('sheetUrl',u||BB_SHEET_URL);
-  if(u) localStorage.setItem('bb_sheetUrl',u);
-  toast('✓ Config saved');
-}
-
-function showSyncStatus(msg,type){
-  var el=document.getElementById('sync-status');
-  if(!el)return;
-  el.style.display='block';
-  el.style.background=type==='ok'?'rgba(0,196,140,.15)':type==='err'?'rgba(255,107,91,.15)':'rgba(91,196,240,.1)';
-  el.style.color=type==='ok'?'var(--accent)':type==='err'?'var(--danger)':'var(--blue)';
-  el.textContent=msg;
-  if(type!=='loading')setTimeout(function(){el.style.display='none';},5000);
-}
-
-// POST a single chunk of rows — no-cors, JSON body
-function postChunk(url,sheetName,rows,replace,done){
-  fetch(url,{
-    method:'POST',
-    mode:'no-cors',
-    headers:{'Content-Type':'text/plain'}, // text/plain avoids preflight on mobile
-    body:JSON.stringify({action:'syncSheet',sheet:sheetName,data:rows,replace:replace})
-  }).then(function(){done(true);}).catch(function(e){
-    console.warn('postChunk error:',e);
-    done(false);
-  });
-}
-
-// Send one full sheet in small chunks of 5 rows
-function syncSheet(url,sheetName,rows,onDone){
-  if(!rows||!rows.length){onDone(true);return;}
-  var CHUNK=5;
-  var chunks=[];
-  for(var i=0;i<rows.length;i+=CHUNK)chunks.push(rows.slice(i,i+CHUNK));
-  var ci=0;
-  function next(){
-    if(ci>=chunks.length){onDone(true);return;}
-    var replace=(ci===0)?1:0;
-    postChunk(url,sheetName,chunks[ci],replace,function(ok){
-      if(!ok){onDone(false);return;}
-      ci++;
-      setTimeout(next,300); // small delay between chunks to avoid rate limiting
-    });
-  }
-  next();
-}
-
-async function syncAllData(){
-  var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url){toast('⚠ No Apps Script URL');return;}
-  showSyncStatus('⬆ Syncing to Google Sheets…','loading');
-  var sheets={
-    Entries:    LS.get('entries')   ||[],
-    Staff:      LS.get('staff')     ||[],
-    Salons:     LS.get('salons')    ||[],
-    Customers:  LS.get('customers') ||[],
-    CashIn:     LS.get('cashIn')    ||[],
-    Expenses:   LS.get('expenses')  ||[],
-    Attendance: LS.get('attendance')||[],
-    StyleCards: (LS.get('styleCards')||[]).map(function(c){
-      return{id:c.id,cardId:c.cardId,customerId:c.customerId,barberId:c.barberId,
-        salonId:c.salonId,name:c.name,createdAt:c.createdAt,topLength:c.topLength,
-        texture:c.texture,fade:c.fade,guard:c.guard,neckline:c.neckline,
-        beard:c.beard,product:c.product,notes:c.notes,
-        zoneFront:c.zones?c.zones.front:'',zoneTop:c.zones?c.zones.top:'',
-        zoneCrown:c.zones?c.zones.crown:'',zoneLeft:c.zones?c.zones.left:'',
-        zoneRight:c.zones?c.zones.right:'',zoneBack:c.zones?c.zones.back:''};
-    }),
-    Visits:      LS.get('visits')    ||[],
-    Advances:    LS.get('advances')  ||[],
-    MgrCashIn:   LS.get('mgrCashIn') ||[],
-    MgrExpenses: LS.get('mgrExpenses')||[],
-    Deductions:(function(){
-      var r=[];try{Object.keys(localStorage).forEach(function(k){
-        if(k.startsWith('bb_ded_')){
-          var p=k.replace('bb_ded_','').split('_'),sid=p[0],mo=p.slice(1).join('_');
-          (JSON.parse(localStorage.getItem(k))||[]).forEach(function(d){r.push({staffId:sid,month:mo,desc:d.desc,amount:d.amount});});
-        }
-      });}catch(e){}return r;
-    })(),
-    AttOverrides:(function(){
-      var r=[];try{Object.keys(localStorage).forEach(function(k){
-        if(k.startsWith('bb_att_')){
-          var p=k.replace('bb_att_','').split('_'),sid=p[0],mo=p.slice(1).join('_');
-          var v=JSON.parse(localStorage.getItem(k))||{};
-          r.push({staffId:sid,month:mo,present:v.present||0,half:v.half||0,absent:v.absent||0});
-        }
-      });}catch(e){}return r;
-    })()
-  };
-  var names=Object.keys(sheets),done=0,errors=0;
-  function next(){
-    if(done>=names.length){
-      if(errors===0){
-        showSyncStatus('✅ All data synced!','ok');
-        toast('✅ Synced to Sheets');
-        var el=document.getElementById('lastSyncTime');
-        if(el)el.textContent='Synced '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-      }else{
-        showSyncStatus('⚠ Some sheets may have failed — retry','err');
-      }
-      return;
-    }
-    var name=names[done],rows=sheets[name];done++;
-    if(!rows.length){next();return;}
-    showSyncStatus('⬆ Syncing '+name+'… ('+done+'/'+names.length+')','loading');
-    syncSheet(url,name,rows,function(ok){if(!ok)errors++;next();});
-  }
-  next();
 }
 
 function applyRestoredData(d){
