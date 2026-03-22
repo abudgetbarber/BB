@@ -116,12 +116,26 @@ var _staffLoaded = false;
         var staffCount = d.staff ? d.staff.length : 0;
         log('Staff records: ' + staffCount, staffCount > 0 ? 'green' : 'orange');
         if(staffCount > 0){
+          // Normalise all string fields before saving
+          d.staff = d.staff.map(function(s){
+            if(s.phone)    s.phone    = String(s.phone);
+            if(s.id)       s.id       = String(s.id);
+            if(s.salonId)  s.salonId  = String(s.salonId);
+            if(s.loginPin!==undefined&&s.loginPin!==null&&s.loginPin!=='') s.loginPin=String(s.loginPin);
+            return s;
+          });
           localStorage.setItem('bb_staff', JSON.stringify(d.staff));
           log('Staff saved to localStorage ✅', 'green');
         } else {
           log('⚠ Staff sheet is empty in Google Sheets', 'orange');
         }
-        if(d.customers && d.customers.length) localStorage.setItem('bb_customers', JSON.stringify(d.customers));
+        if(d.customers && d.customers.length) d.customers = d.customers.map(function(c){
+            if(c.phone)    c.phone    = String(c.phone);
+            if(c.id)       c.id       = String(c.id);
+            if(c.loginPin!==undefined&&c.loginPin!==null&&c.loginPin!=='') c.loginPin=String(c.loginPin);
+            return c;
+          });
+          localStorage.setItem('bb_customers', JSON.stringify(d.customers));
         if(d.salons    && d.salons.length)    localStorage.setItem('bb_salons',    JSON.stringify(d.salons));
         localStorage.setItem('bb_sheetUrl', SHEET_URL);
         _staffLoaded = staffCount > 0;

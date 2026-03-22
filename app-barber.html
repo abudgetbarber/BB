@@ -1801,43 +1801,30 @@ async function syncAllData(){
 }
 
 function applyRestoredData(d){
-  if(d.entries    &&d.entries.length)    LS.set('entries',    d.entries);
-  if(d.staff      &&d.staff.length){
-    d.staff=d.staff.map(function(s){
-      if(s.loginOtp!==undefined&&s.loginOtp!==null&&s.loginOtp!=='') s.loginOtp=String(s.loginOtp);
-      return s;
-    });
-    LS.set('staff',d.staff);
-  }
-  if(d.salons     &&d.salons.length)     LS.set('salons',     d.salons);
-  if(d.customers  &&d.customers.length){
-    d.customers=d.customers.map(function(c){
-      if(c.loginOtp!==undefined&&c.loginOtp!==null&&c.loginOtp!=='') c.loginOtp=String(c.loginOtp);
-      return c;
-    });
-    LS.set('customers',d.customers);
-  }
-  if(d.cashIn     &&d.cashIn.length)     LS.set('cashIn',     d.cashIn);
-  if(d.expenses   &&d.expenses.length)   LS.set('expenses',   d.expenses);
-  if(d.attendance &&d.attendance.length) LS.set('attendance', d.attendance);
-  if(d.styleCards &&d.styleCards.length) LS.set('styleCards', d.styleCards);
-  if(d.visits     &&d.visits.length)     LS.set('visits',     d.visits);
-  if(d.advances   &&d.advances.length)   LS.set('advances',   d.advances);
-  if(d.mgrCashIn  &&d.mgrCashIn.length)  LS.set('mgrCashIn',  d.mgrCashIn);
-  if(d.mgrExpenses&&d.mgrExpenses.length) LS.set('mgrExpenses',d.mgrExpenses);
+  var toStr=function(rec,fields){
+    if(!rec)return rec;
+    fields.forEach(function(f){if(rec[f]!==undefined&&rec[f]!==null&&rec[f]!=='')rec[f]=String(rec[f]);});
+    return rec;
+  };
+  if(d.entries&&d.entries.length)    LS.set('entries',    d.entries.map(function(r){return toStr(r,['id','barberId','salonId','customerPhone']);}));
+  if(d.staff&&d.staff.length)        LS.set('staff',      d.staff.map(function(r){return toStr(r,['id','phone','salonId','loginPin']);}));
+  if(d.salons&&d.salons.length)      LS.set('salons',     d.salons.map(function(r){return toStr(r,['id','mgrPhone']);}));
+  if(d.customers&&d.customers.length)LS.set('customers',  d.customers.map(function(r){return toStr(r,['id','phone','loginPin']);}));
+  if(d.cashIn&&d.cashIn.length)      LS.set('cashIn',     d.cashIn.map(function(r){return toStr(r,['barberId']);}));
+  if(d.expenses&&d.expenses.length)  LS.set('expenses',   d.expenses.map(function(r){return toStr(r,['barberId']);}));
+  if(d.attendance&&d.attendance.length)LS.set('attendance',d.attendance.map(function(r){return toStr(r,['barberId']);}));
+  if(d.styleCards&&d.styleCards.length)LS.set('styleCards',d.styleCards.map(function(r){return toStr(r,['id','customerId','barberId','salonId']);}));
+  if(d.visits&&d.visits.length)      LS.set('visits',     d.visits.map(function(r){return toStr(r,['id','customerId','barberId','salonId']);}));
+  if(d.advances&&d.advances.length)  LS.set('advances',   d.advances.map(function(r){return toStr(r,['barberId']);}));
+  if(d.mgrCashIn&&d.mgrCashIn.length)  LS.set('mgrCashIn',  d.mgrCashIn.map(function(r){return toStr(r,['managerId','salonId']);}));
+  if(d.mgrExpenses&&d.mgrExpenses.length)LS.set('mgrExpenses',d.mgrExpenses.map(function(r){return toStr(r,['managerId','salonId']);}));
   if(d.deductions&&d.deductions.length){
     var dg={};
-    d.deductions.forEach(function(r){
-      var k='ded_'+r.staffId+'_'+r.month;
-      if(!dg[k])dg[k]=[];
-      dg[k].push({desc:r.desc,amount:r.amount});
-    });
+    d.deductions.forEach(function(r){var k='ded_'+r.staffId+'_'+r.month;if(!dg[k])dg[k]=[];dg[k].push({desc:r.desc,amount:r.amount});});
     Object.keys(dg).forEach(function(k){LS.set(k,dg[k]);});
   }
   if(d.attOverrides&&d.attOverrides.length){
-    d.attOverrides.forEach(function(r){
-      LS.set('att_'+r.staffId+'_'+r.month,{present:r.present,half:r.half,absent:r.absent});
-    });
+    d.attOverrides.forEach(function(r){LS.set('att_'+r.staffId+'_'+r.month,{present:r.present,half:r.half,absent:r.absent});});
   }
 }
 

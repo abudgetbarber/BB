@@ -1288,8 +1288,8 @@ function renderCustomers(){
       '<td style="padding:9px 12px;font-size:12px;color:var(--muted)">'+lastDate+'</td>'+
       '<td style="padding:9px 12px;font-size:12px">'+(fav?fav[0]:'—')+'</td>'+
       '<td style="padding:9px 12px">'+
-        (c.loginOtp?
-          '<span style="font-size:11px;color:var(--gold);font-weight:700">🔑 '+c.loginOtp+'</span>':
+        (c.loginPin?
+          '<span style="font-size:11px;color:var(--gold);font-weight:700">🔑 '+c.loginPin+'</span>':
           '<span style="font-size:11px;color:var(--muted2)">Open ✏️</span>')+
       '</td>'+
       '<td style="padding:9px 12px;text-align:center">'+
@@ -1311,9 +1311,9 @@ function openEditCustomer(id){
   document.getElementById('ec-face').value  = c.faceShape  || '';
   document.getElementById('ec-notes').value = c.growthNotes|| '';
   // Load or generate OTP for customer login
-  var otp = c.loginOtp || String(Math.floor(1000+Math.random()*9000));
-  if(!c.loginOtp){
-    customers.find(function(x){return x.id===id;}).loginOtp=otp;
+  var otp = c.loginPin || String(Math.floor(1000+Math.random()*9000));
+  if(!c.loginPin){
+    customers.find(function(x){return x.id===id;}).loginPin=otp;
     LS.set('customers',customers);
   }
   document.getElementById('ec-otp-val').textContent = otp;
@@ -1325,7 +1325,7 @@ function genCustOTP(){
   var c = customers.find(function(x){return x.id===editingCustId;});
   var otp = String(Math.floor(1000+Math.random()*9000));
   document.getElementById('ec-otp-val').textContent = otp;
-  if(c){ c.loginOtp = otp; LS.set('customers',customers); }
+  if(c){ c.loginPin = otp; LS.set('customers',customers); }
 }
 
 function shareCustLogin(){
@@ -1354,7 +1354,7 @@ function saveCustomerEdit(){
   customers[idx].hairType    = document.getElementById('ec-hair').value;
   customers[idx].faceShape   = document.getElementById('ec-face').value;
   customers[idx].growthNotes = document.getElementById('ec-notes').value.trim();
-  customers[idx].loginOtp    = document.getElementById('ec-otp-val').textContent;
+  customers[idx].loginPin    = document.getElementById('ec-otp-val').textContent;
   LS.set('customers', customers);
   updateRowInSheet('Customers',customers[idx],function(ok){if(!ok)toast('⚠ Saved locally');});
   closeModal('editCustModal');
@@ -1416,7 +1416,7 @@ function renderStaff(){
       return '<div class="staff-card">'+
         '<div class="staff-name">'+b.name+'</div>'+
         '<div class="staff-phone">📱 +91 '+b.phone+'</div>'+
-        (b.loginOtp?'<div class="staff-otp">🔑 OTP: '+b.loginOtp+'</div>':'')+
+        (b.loginPin?'<div class="staff-otp">🔑 OTP: '+b.loginPin+'</div>':'')+
         (b.fixedSalary?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Salary: '+fmtINR(b.fixedSalary)+' · Food: '+fmtINR(b.foodMoney||0)+' · Clean: '+fmtINR(b.cleaningMoney||0)+'</div>':'')+
         '<span class="s-badge">✂️ Hairstylist</span>'+
         '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
@@ -1595,7 +1595,7 @@ function addBarber(){
   if(staff.find(function(u){return u.phone===ph;})){ toast('❌ Phone already registered'); return; }
   lastGeneratedOTP = String(Math.floor(1000+Math.random()*9000));
   var newStylist={id:'u'+Date.now(),name:name,phone:ph,role:'barber',salonId:mySalonId,
-    loginOtp:lastGeneratedOTP,fixedSalary:salary,foodMoney:food,cleaningMoney:clean};
+    loginPin:lastGeneratedOTP,fixedSalary:salary,foodMoney:food,cleaningMoney:clean};
   staff.push(newStylist);
   LS.set('staff',staff);
   appendRowToSheet('Staff',newStylist,function(ok){if(!ok)toast('⚠ Saved locally');});
@@ -1921,43 +1921,30 @@ async function syncAllData(){
 }
 
 function applyRestoredData(d){
-  if(d.entries    &&d.entries.length)    LS.set('entries',    d.entries);
-  if(d.staff      &&d.staff.length){
-    d.staff=d.staff.map(function(s){
-      if(s.loginOtp!==undefined&&s.loginOtp!==null&&s.loginOtp!=='') s.loginOtp=String(s.loginOtp);
-      return s;
-    });
-    LS.set('staff',d.staff);
-  }
-  if(d.salons     &&d.salons.length)     LS.set('salons',     d.salons);
-  if(d.customers  &&d.customers.length){
-    d.customers=d.customers.map(function(c){
-      if(c.loginOtp!==undefined&&c.loginOtp!==null&&c.loginOtp!=='') c.loginOtp=String(c.loginOtp);
-      return c;
-    });
-    LS.set('customers',d.customers);
-  }
-  if(d.cashIn     &&d.cashIn.length)     LS.set('cashIn',     d.cashIn);
-  if(d.expenses   &&d.expenses.length)   LS.set('expenses',   d.expenses);
-  if(d.attendance &&d.attendance.length) LS.set('attendance', d.attendance);
-  if(d.styleCards &&d.styleCards.length) LS.set('styleCards', d.styleCards);
-  if(d.visits     &&d.visits.length)     LS.set('visits',     d.visits);
-  if(d.advances   &&d.advances.length)   LS.set('advances',   d.advances);
-  if(d.mgrCashIn  &&d.mgrCashIn.length)  LS.set('mgrCashIn',  d.mgrCashIn);
-  if(d.mgrExpenses&&d.mgrExpenses.length) LS.set('mgrExpenses',d.mgrExpenses);
+  var toStr=function(rec,fields){
+    if(!rec)return rec;
+    fields.forEach(function(f){if(rec[f]!==undefined&&rec[f]!==null&&rec[f]!=='')rec[f]=String(rec[f]);});
+    return rec;
+  };
+  if(d.entries&&d.entries.length)    LS.set('entries',    d.entries.map(function(r){return toStr(r,['id','barberId','salonId','customerPhone']);}));
+  if(d.staff&&d.staff.length)        LS.set('staff',      d.staff.map(function(r){return toStr(r,['id','phone','salonId','loginPin']);}));
+  if(d.salons&&d.salons.length)      LS.set('salons',     d.salons.map(function(r){return toStr(r,['id','mgrPhone']);}));
+  if(d.customers&&d.customers.length)LS.set('customers',  d.customers.map(function(r){return toStr(r,['id','phone','loginPin']);}));
+  if(d.cashIn&&d.cashIn.length)      LS.set('cashIn',     d.cashIn.map(function(r){return toStr(r,['barberId']);}));
+  if(d.expenses&&d.expenses.length)  LS.set('expenses',   d.expenses.map(function(r){return toStr(r,['barberId']);}));
+  if(d.attendance&&d.attendance.length)LS.set('attendance',d.attendance.map(function(r){return toStr(r,['barberId']);}));
+  if(d.styleCards&&d.styleCards.length)LS.set('styleCards',d.styleCards.map(function(r){return toStr(r,['id','customerId','barberId','salonId']);}));
+  if(d.visits&&d.visits.length)      LS.set('visits',     d.visits.map(function(r){return toStr(r,['id','customerId','barberId','salonId']);}));
+  if(d.advances&&d.advances.length)  LS.set('advances',   d.advances.map(function(r){return toStr(r,['barberId']);}));
+  if(d.mgrCashIn&&d.mgrCashIn.length)  LS.set('mgrCashIn',  d.mgrCashIn.map(function(r){return toStr(r,['managerId','salonId']);}));
+  if(d.mgrExpenses&&d.mgrExpenses.length)LS.set('mgrExpenses',d.mgrExpenses.map(function(r){return toStr(r,['managerId','salonId']);}));
   if(d.deductions&&d.deductions.length){
     var dg={};
-    d.deductions.forEach(function(r){
-      var k='ded_'+r.staffId+'_'+r.month;
-      if(!dg[k])dg[k]=[];
-      dg[k].push({desc:r.desc,amount:r.amount});
-    });
+    d.deductions.forEach(function(r){var k='ded_'+r.staffId+'_'+r.month;if(!dg[k])dg[k]=[];dg[k].push({desc:r.desc,amount:r.amount});});
     Object.keys(dg).forEach(function(k){LS.set(k,dg[k]);});
   }
   if(d.attOverrides&&d.attOverrides.length){
-    d.attOverrides.forEach(function(r){
-      LS.set('att_'+r.staffId+'_'+r.month,{present:r.present,half:r.half,absent:r.absent});
-    });
+    d.attOverrides.forEach(function(r){LS.set('att_'+r.staffId+'_'+r.month,{present:r.present,half:r.half,absent:r.absent});});
   }
 }
 

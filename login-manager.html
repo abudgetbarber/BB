@@ -97,8 +97,22 @@ var _fetchDone = false;
     try{
       if(json && json.ok && json.data){
         var d = json.data;
-        if(d.staff     && d.staff.length)     localStorage.setItem('bb_staff',     JSON.stringify(d.staff));
-        if(d.customers && d.customers.length)  localStorage.setItem('bb_customers', JSON.stringify(d.customers));
+        if(d.staff     && d.staff.length)     // Normalise all string fields before saving
+          d.staff = d.staff.map(function(s){
+            if(s.phone)    s.phone    = String(s.phone);
+            if(s.id)       s.id       = String(s.id);
+            if(s.salonId)  s.salonId  = String(s.salonId);
+            if(s.loginPin!==undefined&&s.loginPin!==null&&s.loginPin!=='') s.loginPin=String(s.loginPin);
+            return s;
+          });
+          localStorage.setItem('bb_staff', JSON.stringify(d.staff));
+        if(d.customers && d.customers.length)  d.customers = d.customers.map(function(c){
+            if(c.phone)    c.phone    = String(c.phone);
+            if(c.id)       c.id       = String(c.id);
+            if(c.loginPin!==undefined&&c.loginPin!==null&&c.loginPin!=='') c.loginPin=String(c.loginPin);
+            return c;
+          });
+          localStorage.setItem('bb_customers', JSON.stringify(d.customers));
         if(d.salons    && d.salons.length)     localStorage.setItem('bb_salons',    JSON.stringify(d.salons));
         localStorage.setItem('bb_sheetUrl', SHEET_URL);
         _dataReady = true;
@@ -162,7 +176,7 @@ function doLogin(){
     var staffList = JSON.parse(localStorage.getItem('bb_staff')) || [];
   var sm = staffList.find(function(u){ return u.phone===phone && u.role==='manager'; });
   if(!sm){ errEl.textContent='Phone not registered as Manager — check with admin'; errEl.style.display='block'; return; }
-  if(!sm.loginOtp && sm.loginOtp!==0 || String(sm.loginOtp) !== String(pin)){ errEl.textContent='Wrong PIN. Try again.'; errEl.style.display='block'; document.getElementById('pinInput').value=''; return; }
+  if(!sm.loginPin && sm.loginPin!==0 || String(sm.loginPin) !== String(pin)){ errEl.textContent='Wrong PIN. Try again.'; errEl.style.display='block'; document.getElementById('pinInput').value=''; return; }
   sessionStorage.setItem('bb_role','manager');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', sm.name||'Manager');
