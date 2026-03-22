@@ -54,12 +54,12 @@ input::placeholder{color:#AAAAAA}
   </div>
   
   <!-- Restore from Sheets (shown when no local data) -->
-  <div id="restore-section" style="display:none;margin-top:20px;background:rgba(255,209,0,.08);border:1.5px solid rgba(255,209,0,.25);border-radius:10px;padding:14px">
-    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#767668;margin-bottom:8px">📡 First Time on This Device?</div>
+  <div id="restore-section" style="display:none;margin-top:16px;background:rgba(0,61,43,.06);border:1.5px solid rgba(0,61,43,.2);border-radius:10px;padding:12px;text-align:center">
+    <div id="restore-status" style="font-size:13px;color:#767668;line-height:1.5">⬇ Loading staff data…</div>
+  </div>
     <div style="font-size:12px;color:#767668;margin-bottom:10px;line-height:1.5">Paste your salon's Google Sheets URL to load staff data, then log in normally.</div>
-    <input type="url" id="restore-url" placeholder="https://script.google.com/macros/s/..."
-      style="width:100%;padding:9px 11px;background:#F8F8F4;border:2px solid #E0E0D8;border-radius:8px;font-size:12px;font-family:inherit;outline:none;margin-bottom:8px;color:#1A1A14">
-    <button onclick="doRestoreLogin()" style="width:100%;padding:11px;background:#004F38;border:none;border-radius:8px;font-size:13px;font-weight:800;color:#F5E030;font-family:inherit;cursor:pointer;text-transform:uppercase;letter-spacing:.5px">⬇ Load Staff Data</button>
+    
+    
     <div id="restore-status" style="font-size:11px;color:#767668;margin-top:8px;min-height:16px;text-align:center"></div>
   </div>
 
@@ -143,48 +143,50 @@ function doLogin(){
     window.location.href='app-barber.html';
   }catch(e){errEl.textContent='Login error. Please try again.';errEl.style.display='block';}
 }
-document.addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+document.addEventListener('keydown',function(e){if(e.key==='Enter')fetchLatestAndLogin(doLogin);});
 
-// ── FIRST-DEVICE RESTORE ──
+// ── AUTO-RESTORE: fetch data on page load if no local data ──
 (function(){
   var hasData=localStorage.getItem('bb_staff')||localStorage.getItem('bb_customers');
-  if(!hasData){var el=document.getElementById('restore-section');if(el)el.style.display='block';}
-})();
-function doRestoreLogin(){
-  var url=document.getElementById('restore-url').value.trim();
-  if(!url){document.getElementById('restore-status').textContent='⚠ Paste the URL first';return;}
-  document.getElementById('restore-status').textContent='⬇ Loading…';
-  var cbName='_lr'+Date.now();
-  var script=document.createElement('script');
-  var done=false;
+  if(hasData)return;
+  var el=document.getElementById('restore-section');
+  var st=document.getElementById('restore-status');
+  if(el)el.style.display='block';
+  var url='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
+  var cbName='_autoR'+Date.now(),s=document.createElement('script'),done=false;
   var timer=setTimeout(function(){
-    if(done)return;done=true;delete window[cbName];if(script.parentNode)document.head.removeChild(script);
-    document.getElementById('restore-status').textContent='❌ Timed out.';
-  },25000);
+    if(done)return;done=true;delete window[cbName];
+    if(s.parentNode)document.head.removeChild(s);
+    if(st)st.textContent='⚠ Could not reach server. Check internet and try again.';
+  },20000);
   window[cbName]=function(json){
-    if(done)return;done=true;clearTimeout(timer);delete window[cbName];if(script.parentNode)document.head.removeChild(script);
+    if(done)return;done=true;clearTimeout(timer);delete window[cbName];
+    if(s.parentNode)document.head.removeChild(s);
     try{
-      if(!json||!json.ok||!json.data)throw new Error(json&&json.error?json.error:'No data');
+      if(!json||!json.ok||!json.data)throw new Error('No data');
       var d=json.data;
-      if(d.staff    &&d.staff.length)    localStorage.setItem('bb_staff',    JSON.stringify(d.staff));
-      if(d.salons   &&d.salons.length)   localStorage.setItem('bb_salons',   JSON.stringify(d.salons));
-      if(d.customers&&d.customers.length)localStorage.setItem('bb_customers',JSON.stringify(d.customers));
-      if(d.entries  &&d.entries.length)  localStorage.setItem('bb_entries',  JSON.stringify(d.entries));
-      if(d.cashIn   &&d.cashIn.length)   localStorage.setItem('bb_cashIn',   JSON.stringify(d.cashIn));
-      if(d.expenses &&d.expenses.length) localStorage.setItem('bb_expenses', JSON.stringify(d.expenses));
+      if(d.staff     &&d.staff.length)     localStorage.setItem('bb_staff',    JSON.stringify(d.staff));
+      if(d.salons    &&d.salons.length)    localStorage.setItem('bb_salons',   JSON.stringify(d.salons));
+      if(d.customers &&d.customers.length) localStorage.setItem('bb_customers',JSON.stringify(d.customers));
+      if(d.entries   &&d.entries.length)   localStorage.setItem('bb_entries',  JSON.stringify(d.entries));
+      if(d.cashIn    &&d.cashIn.length)    localStorage.setItem('bb_cashIn',   JSON.stringify(d.cashIn));
+      if(d.expenses  &&d.expenses.length)  localStorage.setItem('bb_expenses', JSON.stringify(d.expenses));
       if(d.attendance&&d.attendance.length)localStorage.setItem('bb_attendance',JSON.stringify(d.attendance));
       if(d.styleCards&&d.styleCards.length)localStorage.setItem('bb_styleCards',JSON.stringify(d.styleCards));
-      if(d.visits   &&d.visits.length)   localStorage.setItem('bb_visits',   JSON.stringify(d.visits));
+      if(d.visits    &&d.visits.length)    localStorage.setItem('bb_visits',   JSON.stringify(d.visits));
       localStorage.setItem('bb_sheetUrl',url);
-      localStorage.setItem('bb_seeded','true');
-      var rs=document.getElementById('restore-section');if(rs)rs.style.display='none';
-      document.getElementById('restore-status').textContent='✅ Data loaded! Now enter your PIN.';
-    }catch(e){document.getElementById('restore-status').textContent='❌ '+e.message;}
+      if(el)el.style.display='none';
+    }catch(e){
+      if(st)st.textContent='❌ '+e.message;
+    }
   };
-  script.onerror=function(){if(done)return;done=true;clearTimeout(timer);document.getElementById('restore-status').textContent='❌ Could not reach URL.';};
-  script.src=url+(url.indexOf('?')>-1?'&':'?')+'action=read&callback='+cbName;
-  document.head.appendChild(script);
-}
+  s.onerror=function(){
+    if(done)return;done=true;clearTimeout(timer);
+    if(st)st.textContent='❌ Network error — check internet.';
+  };
+  s.src=url+'?action=read&callback='+cbName;
+  document.head.appendChild(s);
+})();
 
 </script>
 </body>
