@@ -811,28 +811,23 @@ function filterByMonth(e,mo){if(!mo)return e;var p=mo.split('-');return e.filter
 (function autoLoad(){
   var url=LS.get('sheetUrl')||BB_SHEET_URL;
   if(!url)return;
-
-  // Always check Sheets on load — show banner briefly while loading
-  var staff=LS.get('staff')||[];
   var banner=document.getElementById('restoreBanner');
-
-  // If no data at all — must load from Sheets before proceeding
-  if(!staff.length){
-    if(banner)banner.style.display='flex';
-    fetchFromSheets(url,
-      function(data){
-        applyRestoredData(data);
-        if(banner)banner.style.display='none';
-        // Reload so the app initialises with the fresh data
-        location.reload();
-      },
-      function(err){
-        if(banner)banner.style.display='none';
-        console.warn('Auto-load failed:',err);
-        // Let the app continue — user can restore manually
-      }
-    );
-  }
+  if(banner)banner.style.display='flex';
+  // Always fetch from Sheets on load — Sheets is the single source of truth
+  fetchFromSheets(url,
+    function(data){
+      applyRestoredData(data);
+      if(banner)banner.style.display='none';
+      // Only reload if no staff was in localStorage (first load)
+      var hadStaff=(LS.get('staff')||[]).length>0;
+      if(!hadStaff){ location.reload(); }
+      else{ renderOverview(); renderManage(); }
+    },
+    function(err){
+      if(banner)banner.style.display='none';
+      console.warn('Auto-load failed:',err);
+    }
+  );
 })();
 
 // ── INIT ──
@@ -1528,9 +1523,16 @@ async function syncAllData(){
   showSyncStatus('⬆ Syncing to Google Sheets…','loading');
   var sheets={
     Entries:    LS.get('entries')   ||[],
-    Staff:      LS.get('staff')     ||[],
+    Staff:      (LS.get('staff')||[]).map(function(s){
+      // Ensure loginOtp is always stored as string in Sheets
+      if(s.loginOtp!==undefined&&s.loginOtp!==null) s.loginOtp=String(s.loginOtp);
+      return s;
+    }),
     Salons:     LS.get('salons')    ||[],
-    Customers:  LS.get('customers') ||[],
+    Customers:  (LS.get('customers')||[]).map(function(c){
+      if(c.loginOtp!==undefined&&c.loginOtp!==null) c.loginOtp=String(c.loginOtp);
+      return c;
+    }),
     CashIn:     LS.get('cashIn')    ||[],
     Expenses:   LS.get('expenses')  ||[],
     Attendance: LS.get('attendance')||[],
@@ -1588,9 +1590,24 @@ async function syncAllData(){
 
 function applyRestoredData(d){
   if(d.entries    &&d.entries.length)    LS.set('entries',    d.entries);
-  if(d.staff      &&d.staff.length)      LS.set('staff',      d.staff);
+  if(d.staff      &&d.staff.length){
+    // Normalise loginOtp to string — Sheets returns numbers, login expects strings
+    d.staff=d.staff.map(function(s){
+      if(s.loginOtp!==undefined&&s.loginOtp!==null&&s.loginOtp!==''){
+        s.loginOtp=String(s.loginOtp);
+      }
+      return s;
+    });
+    LS.set('staff',d.staff);
+  }
   if(d.salons     &&d.salons.length)     LS.set('salons',     d.salons);
-  if(d.customers  &&d.customers.length)  LS.set('customers',  d.customers);
+  if(d.customers  &&d.customers.length){
+    d.customers=d.customers.map(function(c){
+      if(c.loginOtp!==undefined&&c.loginOtp!==null&&c.loginOtp!=='') c.loginOtp=String(c.loginOtp);
+      return c;
+    });
+    LS.set('customers',d.customers);
+  }
   if(d.cashIn     &&d.cashIn.length)     LS.set('cashIn',     d.cashIn);
   if(d.expenses   &&d.expenses.length)   LS.set('expenses',   d.expenses);
   if(d.attendance &&d.attendance.length) LS.set('attendance', d.attendance);

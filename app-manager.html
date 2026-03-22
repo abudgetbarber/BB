@@ -1922,9 +1922,21 @@ async function syncAllData(){
 
 function applyRestoredData(d){
   if(d.entries    &&d.entries.length)    LS.set('entries',    d.entries);
-  if(d.staff      &&d.staff.length)      LS.set('staff',      d.staff);
+  if(d.staff      &&d.staff.length){
+    d.staff=d.staff.map(function(s){
+      if(s.loginOtp!==undefined&&s.loginOtp!==null&&s.loginOtp!=='') s.loginOtp=String(s.loginOtp);
+      return s;
+    });
+    LS.set('staff',d.staff);
+  }
   if(d.salons     &&d.salons.length)     LS.set('salons',     d.salons);
-  if(d.customers  &&d.customers.length)  LS.set('customers',  d.customers);
+  if(d.customers  &&d.customers.length){
+    d.customers=d.customers.map(function(c){
+      if(c.loginOtp!==undefined&&c.loginOtp!==null&&c.loginOtp!=='') c.loginOtp=String(c.loginOtp);
+      return c;
+    });
+    LS.set('customers',d.customers);
+  }
   if(d.cashIn     &&d.cashIn.length)     LS.set('cashIn',     d.cashIn);
   if(d.expenses   &&d.expenses.length)   LS.set('expenses',   d.expenses);
   if(d.attendance &&d.attendance.length) LS.set('attendance', d.attendance);
