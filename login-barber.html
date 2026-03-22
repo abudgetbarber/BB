@@ -187,8 +187,8 @@ function doLogin(){
     return;
   }
   log('Found: ' + sm.name + ' role=' + sm.role, 'green');
-  if(!sm.loginOtp || sm.loginOtp !== pin){
-    log('❌ PIN mismatch. Stored PIN: ' + sm.loginOtp + ' Entered: ' + pin, 'red');
+  if(!sm.loginOtp && sm.loginOtp!==0 || String(sm.loginOtp) !== String(pin)){
+    log('❌ PIN mismatch. Stored: ' + JSON.stringify(sm.loginOtp) + ' (type:'+typeof sm.loginOtp+') Entered: ' + JSON.stringify(pin) + ' (type:'+typeof pin+')', 'red');
     errEl.textContent='Wrong PIN. Try again.';
     errEl.style.display='block';
     document.getElementById('pinInput').value='';

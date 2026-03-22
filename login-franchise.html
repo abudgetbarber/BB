@@ -162,7 +162,7 @@ function doLogin(){
     var staffList = JSON.parse(localStorage.getItem('bb_staff')) || [];
   var sm = staffList.find(function(u){ return u.phone===phone && u.role==='franchise'; });
   if(!sm){ errEl.textContent='Phone not registered as Franchise Owner — check with admin'; errEl.style.display='block'; return; }
-  if(!sm.loginOtp || sm.loginOtp !== pin){ errEl.textContent='Wrong PIN. Try again.'; errEl.style.display='block'; document.getElementById('pinInput').value=''; return; }
+  if(!sm.loginOtp && sm.loginOtp!==0 || String(sm.loginOtp) !== String(pin)){ errEl.textContent='Wrong PIN. Try again.'; errEl.style.display='block'; document.getElementById('pinInput').value=''; return; }
   sessionStorage.setItem('bb_role','franchise');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', sm.name||'Franchise Owner');
