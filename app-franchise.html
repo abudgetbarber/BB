@@ -472,7 +472,7 @@ body{font-family:var(--BF);background:var(--bg);color:var(--white);font-size:15p
 <div class="toast-el" id="toastEl"></div>
 
 <script>
-var BB_SHEET_URL='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
+var BB_SHEET_URL='https://script.google.com/macros/s/AKfycbwaTYPcStdiRKSNVT-tQCwyUWpeeQyRLgBkMceWxq_U20ATRw-bu6BKCWwqVCuK6E05/exec';
 
 // ── DIRECT SHEETS HELPERS ──
 function appendRowToSheet(sheetName,rowObj,onDone){
@@ -562,7 +562,7 @@ var LS = {
 })();
 
 // Ensure Sheet URL is always configured
-(function(){var U='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';if(!localStorage.getItem('bb_sheetUrl')&&U)localStorage.setItem('bb_sheetUrl',U);if(!LS.get('sheetUrl')&&U)LS.set('sheetUrl',U);})();
+(function(){var U='https://script.google.com/macros/s/AKfycbwaTYPcStdiRKSNVT-tQCwyUWpeeQyRLgBkMceWxq_U20ATRw-bu6BKCWwqVCuK6E05/exec';if(!localStorage.getItem('bb_sheetUrl')&&U)localStorage.setItem('bb_sheetUrl',U);if(!LS.get('sheetUrl')&&U)LS.set('sheetUrl',U);})();
 // ── HELPERS ──
 function today()    { return new Date().toLocaleDateString('en-IN'); }
 function todayISO() { return new Date().toISOString().split('T')[0]; }
@@ -619,17 +619,6 @@ var ME=null, mySalonId=null, mySalonName='My Outlet';
   renderDashboard();
 })();
 
-// ── AUTO SYNC (every 5 minutes) ──
-var autoSyncInterval=null;
-function startAutoSync(){
-  if(autoSyncInterval)clearInterval(autoSyncInterval);
-  var url=LS.get('sheetUrl');
-  if(!url)return; // only start if URL is configured
-  autoSyncInterval=setInterval(function(){
-    silentSync();
-  }, 5*60*1000); // 5 minutes
-}
-
 function showTab(tab){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.nt').forEach(function(b){b.classList.remove('on');});
@@ -667,10 +656,8 @@ function frSaveSheetConfig(){
   var u=document.getElementById('fr-sh-url').value.trim();
   var n=document.getElementById('fr-sh-name').value.trim()||'Sheet1';
   LS.set('sheetUrl',u||BB_SHEET_URL);
-  LS.set('sheetName',n);
   if(u) localStorage.setItem('bb_sheetUrl',u);
   toast('✓ Config saved');
-  startAutoSync();
 }
 
 function frShowSyncStatus(msg,type){
@@ -839,94 +826,16 @@ function fetchFromSheets(url, onSuccess, onError){
   script.src=url+'?action=read&callback='+cbName+'&_='+Date.now();
   document.head.appendChild(script);
 }
-// ── AUTO-RESTORE on every page load ──
-(function autoRestore(){
-  var url=BB_SHEET_URL||LS.get('sheetUrl')||localStorage.getItem('bb_sheetUrl');
-  if(!url)return;
-  LS.set('sheetUrl',url);
-  localStorage.setItem('bb_sheetUrl',url);
-  var hasData=(LS.get('staff')||[]).length>0;
-  if(hasData)return;
-  var banner=document.getElementById('restoreBanner');
-  if(banner)banner.style.display='flex';
-  fetchFromSheets(url,function(d){
-    applySheetData(d);
-    if(banner)banner.style.display='none';
-    setTimeout(function(){location.reload();},300);
-  },function(err){
-    console.warn('Auto-restore failed:',err);
-    if(banner)banner.style.display='none';
-  },15000);
-})();
-
 
 // ── SHARED: apply restored data to localStorage ──
-function applySheetData(d){
-  if(d.entries    &&d.entries.length)    LS.set('entries',d.entries);
-  if(d.staff      &&d.staff.length)      LS.set('staff',d.staff);
-  if(d.salons     &&d.salons.length)     LS.set('salons',d.salons);
-  if(d.customers  &&d.customers.length)  LS.set('customers',d.customers);
-  if(d.cashIn     &&d.cashIn.length)     LS.set('cashIn',d.cashIn);
-  if(d.expenses   &&d.expenses.length)   LS.set('expenses',d.expenses);
-  if(d.attendance &&d.attendance.length) LS.set('attendance',d.attendance);
-  if(d.styleCards &&d.styleCards.length) LS.set('styleCards',d.styleCards);
-  if(d.visits     &&d.visits.length)     LS.set('visits',d.visits);
-  if(d.advances   &&d.advances.length)   LS.set('advances',d.advances);
-  if(d.mgrCashIn  &&d.mgrCashIn.length)  LS.set('mgrCashIn',d.mgrCashIn);
-  if(d.mgrExpenses&&d.mgrExpenses.length) LS.set('mgrExpenses',d.mgrExpenses);
-  if(d.deductions&&d.deductions.length){
-    var dg={};
-    d.deductions.forEach(function(r){
-      var k='ded_'+r.staffId+'_'+r.month;
-      if(!dg[k])dg[k]=[];
-      dg[k].push({desc:r.desc,amount:r.amount});
-    });
-    Object.keys(dg).forEach(function(k){LS.set(k,dg[k]);});
-  }
-  if(d.attOverrides&&d.attOverrides.length){
-    d.attOverrides.forEach(function(r){
-      LS.set('att_'+r.staffId+'_'+r.month,{present:r.present,half:r.half,absent:r.absent});
-    });
-  }
-}
-
 // ── JSONP fetch from Sheets (works on all devices) ──
-function fetchFromSheets(url, onSuccess, onFail, timeoutMs){
-  timeoutMs = timeoutMs || 20000;
-  var cbName='_bbFetch'+Date.now(), done=false;
-  var script=document.createElement('script');
-  var timer=setTimeout(function(){
-    if(done)return; done=true;
-    delete window[cbName];
-    if(script.parentNode)document.head.removeChild(script);
-    if(onFail)onFail('timeout');
-  }, timeoutMs);
-  window[cbName]=function(json){
-    if(done)return; done=true;
-    clearTimeout(timer);
-    delete window[cbName];
-    if(script.parentNode)document.head.removeChild(script);
-    if(json&&json.ok&&json.data) onSuccess(json.data);
-    else if(onFail)onFail(json&&json.error?json.error:'no data');
-  };
-  script.onerror=function(){
-    if(done)return; done=true;
-    clearTimeout(timer);
-    delete window[cbName];
-    if(onFail)onFail('network error');
-  };
-  // Add timestamp to bypass cache
-  script.src=url+'?action=read&callback='+cbName+'&t='+Date.now();
-  document.head.appendChild(script);
-}
-
 async function frRestoreFromSheets(){
   var url=BB_SHEET_URL||LS.get('sheetUrl')||localStorage.getItem('bb_sheetUrl');
   if(!url){toast('⚠ No Apps Script URL configured');return;}
   if(!confirm('Replace ALL local data with data from Google Sheets?'))return;
   frShowSyncStatus('⬇ Loading from Google Sheets…','loading');
   fetchFromSheets(url, function(d){
-    applySheetData(d);
+    applyRestoredData(d);
     frShowSyncStatus('✅ Data restored successfully!','ok');
     toast('✅ Restored — reloading…');
     setTimeout(function(){location.reload();},1500);
@@ -939,38 +848,6 @@ async function frRestoreFromSheets(){
 
 
 // ── AUTO-SYNC every 5 minutes (silent) ──
-var autoSyncInterval=null;
-function startAutoSync(){
-  if(autoSyncInterval)clearInterval(autoSyncInterval);
-  var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url)return;
-  autoSyncInterval=setInterval(function(){silentSync();},5*60*1000);
-}
-function silentSync(){
-  var url=LS.get('sheetUrl')||BB_SHEET_URL;
-  if(!url)return;
-  var core={
-    Entries:    LS.get('entries')   ||[],
-    Staff:      LS.get('staff')     ||[],
-    Customers:  LS.get('customers') ||[],
-    CashIn:     LS.get('cashIn')    ||[],
-    Expenses:   LS.get('expenses')  ||[],
-    Attendance: LS.get('attendance')||[]
-  };
-  var names=Object.keys(core),i=0;
-  function nxt(){
-    if(i>=names.length){
-      var el=document.getElementById('lastSyncTime');
-      if(el)el.textContent='Synced '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-      return;
-    }
-    var name=names[i],rows=core[name];i++;
-    if(!rows.length){nxt();return;}
-    syncSheet(url,name,rows,function(){nxt();});
-  }
-  nxt();
-}
-startAutoSync();
 
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -998,110 +875,6 @@ function renderCustomers(){
 }
 
 // ── DASHBOARD ──
-function renderDashboard(){
-  var allE    = getEntries().filter(function(e){return e.salonId===mySalonId;});
-  var todayE  = allE.filter(function(e){return e.date===today();});
-  var selMo   = document.getElementById('dash-month').value || new Date().toISOString().slice(0,7);
-  var monthE  = filterByMonth(allE, selMo);
-  var myStylists=(LS.get('staff')||[]).filter(function(u){return u.salonId===mySalonId&&u.role==='barber';});
-
-  // Stats
-  var totT   = todayE.reduce(function(a,e){return a+Number(e.phPay||0)+Number(e.cash||0);},0);
-  var totPhT = todayE.reduce(function(a,e){return a+Number(e.phPay||0);},0);
-  var totCshT= todayE.reduce(function(a,e){return a+Number(e.cash||0);},0);
-  var totM   = monthE.reduce(function(a,e){return a+Number(e.phPay||0)+Number(e.cash||0);},0);
-  document.getElementById('dash-stats').innerHTML=
-    '<div class="sc accent"><div class="sc-lbl">Today Customers</div><div class="sc-val">'+todayE.length+'</div></div>'+
-    '<div class="sc g"><div class="sc-lbl">Today Sales</div><div class="sc-val" style="font-size:18px">'+fmtINR(totT)+'</div></div>'+
-    '<div class="sc b"><div class="sc-lbl">PhonePe Today</div><div class="sc-val" style="font-size:18px">'+fmtINR(totPhT)+'</div></div>'+
-    '<div class="sc gr"><div class="sc-lbl">Cash Today</div><div class="sc-val" style="font-size:18px">'+fmtINR(totCshT)+'</div></div>'+
-    '<div class="sc"><div class="sc-lbl">Month Sales</div><div class="sc-val" style="font-size:18px">'+fmtINR(totM)+'</div></div>'+
-    '<div class="sc accent"><div class="sc-lbl">Stylists</div><div class="sc-val">'+myStylists.length+'</div></div>';
-
-  // Outlet summary (cash-in / expenses)
-  var stylistIds=myStylists.map(function(u){return u.id;});
-  var ciToday=(LS.get('cashIn')||[]).filter(function(e){return e.date===today()&&stylistIds.indexOf(e.barberId)>-1;});
-  var exToday=(LS.get('expenses')||[]).filter(function(e){return e.date===today()&&stylistIds.indexOf(e.barberId)>-1;});
-  var totalCi=ciToday.reduce(function(a,e){return a+Number(e.amount||0);},0);
-  var totalEx=exToday.reduce(function(a,e){return a+Number(e.amount||0);},0);
-  document.getElementById('outlet-summary').innerHTML=
-    '<div class="os-box ci"><div class="os-lbl">💵 Cash In</div><div class="os-val">'+fmtINR(totalCi)+'</div></div>'+
-    '<div class="os-box ex"><div class="os-lbl">🧾 Expenses</div><div class="os-val">'+fmtINR(totalEx)+'</div></div>'+
-    '<div class="os-box net"><div class="os-lbl">📊 Net</div><div class="os-val">'+fmtINR(totalCi-totalEx)+'</div></div>';
-
-  // Expense log
-  var expEl=document.getElementById('expense-log');
-  if(exToday.length){
-    expEl.innerHTML='<div style="background:rgba(224,107,91,.07);border:1px solid rgba(224,107,91,.2);border-radius:var(--r);padding:12px 14px;margin-bottom:12px">'+
-      '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--danger);margin-bottom:8px">🧾 Today&#39;s Expenses ('+exToday.length+')</div>'+
-      exToday.slice().reverse().map(function(e){
-        var st=(LS.get('staff')||[]).find(function(u){return u.id===e.barberId;});
-        return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px">'+
-          '<div><span style="color:var(--white)">'+e.desc+'</span><span style="color:var(--muted2);font-size:10px;margin-left:6px">'+e.time+(st?' · '+st.name:'')+'</span></div>'+
-          '<span style="color:var(--danger);font-weight:700">'+fmtINR(e.amount)+'</span></div>';
-      }).join('')+'</div>';
-  } else {
-    expEl.innerHTML='';
-  }
-
-  // Monthly stats
-  var mName=new Date(parseInt(selMo.split('-')[0]),parseInt(selMo.split('-')[1])-1,1).toLocaleString('default',{month:'long',year:'numeric'});
-  var totMPh  =monthE.reduce(function(a,e){return a+Number(e.phPay||0);},0);
-  var totMCash=monthE.reduce(function(a,e){return a+Number(e.cash||0);},0);
-  var totMTip =monthE.reduce(function(a,e){return a+Number(e.tip||0);},0);
-  document.getElementById('month-stats').innerHTML=
-    '<div class="sc" style="border-left:3px solid var(--accent)"><div class="sc-lbl">'+mName+' Sales</div><div class="sc-val" style="font-size:18px">'+fmtINR(totM)+'</div></div>'+
-    '<div class="sc b"><div class="sc-lbl">PhonePe</div><div class="sc-val" style="font-size:18px">'+fmtINR(totMPh)+'</div></div>'+
-    '<div class="sc gr"><div class="sc-lbl">Cash</div><div class="sc-val" style="font-size:18px">'+fmtINR(totMCash)+'</div></div>'+
-    '<div class="sc warn"><div class="sc-lbl">Tips</div><div class="sc-val" style="font-size:18px">'+fmtINR(totMTip)+'</div></div>'+
-    '<div class="sc a"><div class="sc-lbl">Customers</div><div class="sc-val">'+monthE.length+'</div></div>';
-
-  // Monthly bar chart
-  var yr=parseInt(selMo.split('-')[0]),mo=parseInt(selMo.split('-')[1]);
-  var daysInMonth=new Date(yr,mo,0).getDate();
-  var dayTotals=[];
-  for(var d=1;d<=daysInMonth;d++){
-    var ds=d+'/'+mo+'/'+yr;
-    var t=monthE.filter(function(e){return e.date===ds;}).reduce(function(a,e){return a+Number(e.phPay||0)+Number(e.cash||0);},0);
-    dayTotals.push({day:d,tot:t});
-  }
-  var maxT=Math.max.apply(null,dayTotals.map(function(x){return x.tot;}));if(maxT===0)maxT=1;
-  document.getElementById('month-chart').innerHTML=
-    '<div class="month-chart"><div class="chart-title">Daily Sales — '+mName+'</div>'+
-    '<div class="bar-chart">'+dayTotals.map(function(d){
-      return '<div class="bar-group"><div class="bar" style="height:'+Math.max(3,Math.round((d.tot/maxT)*100))+'%" data-tip="'+fmtINR(d.tot)+'"></div><div class="bar-lbl">'+d.day+'</div></div>';
-    }).join('')+'</div></div>';
-
-  // Hairstylist performance cards with attendance
-  var attLog=LS.get('attendance')||[];
-  document.getElementById('dash-stylists').innerHTML=myStylists.map(function(u){
-    var ue=todayE.filter(function(e){return e.barberId===u.id;});
-    var ph=ue.reduce(function(a,e){return a+Number(e.phPay||0);},0);
-    var ca=ue.reduce(function(a,e){return a+Number(e.cash||0);},0);
-    var ti=ue.reduce(function(a,e){return a+Number(e.tip||0);},0);
-    var attToday=attLog.filter(function(r){return r.barberId===u.id&&r.date===today();});
-    var inRecs =attToday.filter(function(r){return r.type==='in';});
-    var outRecs=attToday.filter(function(r){return r.type==='out';});
-    var attHtml='';
-    if(inRecs.length||outRecs.length){
-      attHtml='<div style="margin-top:5px;font-size:10px;display:flex;gap:8px;flex-wrap:wrap">';
-      if(inRecs.length)  attHtml+='<span style="color:var(--accent)">🟢 In: '+inRecs.map(function(r){return r.time;}).join(', ')+'</span>';
-      if(outRecs.length) attHtml+='<span style="color:var(--danger)">🔴 Out: '+outRecs.map(function(r){return r.time;}).join(', ')+'</span>';
-      attHtml+='</div>';
-    } else {
-      attHtml='<div style="margin-top:4px;font-size:10px;color:var(--muted2)">Not clocked in</div>';
-    }
-    return '<div class="bc"><div class="bc-ava">✂️</div>'+
-      '<div class="bc-name">'+u.name+'</div>'+
-      '<div class="bc-total">'+fmtINR(ph+ca)+'</div>'+
-      '<div class="bc-count">'+ue.length+' customers'+(ti>0?' · Tip '+fmtINR(ti):'')+'</div>'+
-      attHtml+'</div>';
-  }).join('')||'<div style="color:var(--muted);font-size:13px;grid-column:span 2">No hairstylists found.</div>';
-
-  // Today's customer table
-  document.getElementById('dash-bills').innerHTML=buildTable(todayE);
-}
-
 // ── SALES TAB ──
 var salFilterMode='day';
 function setSalesFilter(mode){
@@ -1114,155 +887,7 @@ function setSalesFilter(mode){
   renderSales();
   if(mode==='month') renderMonthlyBreakdown();
 }
-function renderSales(){
-  var allE=getEntries().filter(function(e){return e.salonId===mySalonId;});
-  var entries=[];
-  if(salFilterMode==='day'){
-    var from=document.getElementById('sal-from').value;
-    var to  =document.getElementById('sal-to').value;
-    var bid =document.getElementById('sal-stylist').value;
-    entries=allE.filter(function(e){
-      var d=localToISO(e.date);
-      if(from&&d<from)return false;
-      if(to&&d>to)return false;
-      if(bid&&e.barberId!==bid)return false;
-      return true;
-    });
-  } else {
-    var mo =document.getElementById('sal-month-pick').value||new Date().toISOString().slice(0,7);
-    var bid2=document.getElementById('sal-stylist-mon').value;
-    entries=filterByMonth(allE,mo);
-    if(bid2)entries=entries.filter(function(e){return e.barberId===bid2;});
-  }
-  var totPh  =entries.reduce(function(a,e){return a+Number(e.phPay||0);},0);
-  var totCash=entries.reduce(function(a,e){return a+Number(e.cash||0);},0);
-  var totPhTip =entries.reduce(function(a,e){return a+Number(e.phTip||0);},0);
-  var totCashTip=entries.reduce(function(a,e){return a+Number(e.cashTip||0);},0);
-  var totS   =totPh+totCash;
-  document.getElementById('sal-totbar').innerHTML=
-    '<div class="tot-item">Customers: <b>'+entries.length+'</b></div>'+
-    '<div class="tot-item">PhonePe: <b style="color:var(--blue)">'+fmtINR(totPh)+'</b></div>'+
-    '<div class="tot-item">Cash: <b style="color:var(--green)">'+fmtINR(totCash)+'</b></div>'+
-    '<div class="tot-item">Ph Tips: <b style="color:var(--warn)">'+fmtINR(totPhTip)+'</b></div>'+
-    '<div class="tot-item">Cash Tips: <b style="color:var(--warn)">'+fmtINR(totCashTip)+'</b></div>'+
-    '<div class="tot-item">Sales: <b style="color:var(--gold)">'+fmtINR(totS)+'</b></div>';
-  document.getElementById('sal-body').innerHTML=!entries.length?
-    '<div class="tbl-empty">No entries for this period.</div>':
-    entries.map(function(e,i){
-      var sales  =Number(e.phPay||0)+Number(e.cash||0);
-      var phTip  =Number(e.phTip||0);
-      var cashTip=Number(e.cashTip||0);
-      return '<div class="tbl-row cols-v">'+
-        '<span style="color:var(--muted2);font-size:10px">'+(i+1)+'</span>'+
-        '<span style="font-size:10px;color:var(--muted);line-height:1.3">'+e.date+'<br>'+e.time+'</span>'+
-        '<span style="font-size:11px;font-weight:600">'+e.barberName+'</span>'+
-        '<span style="font-size:11px;color:var(--muted)">'+(e.customerName||'Walk-in')+'</span>'+
-        '<span style="font-size:11px;color:var(--muted)">'+e.services+'</span>'+
-        '<span class="tag-ph">'+(Number(e.phPay||0)>0?fmtINR(e.phPay):'—')+'</span>'+
-        '<span class="tag-cash">'+(Number(e.cash||0)>0?fmtINR(e.cash):'—')+'</span>'+
-        '<span class="tag-tip">'+(phTip>0?fmtINR(phTip):'—')+'</span>'+
-        '<span class="tag-tip">'+(cashTip>0?fmtINR(cashTip):'—')+'</span>'+
-        '<span class="tag-tot">'+fmtINR(sales)+'</span>'+
-      '</div>';
-    }).join('');
-  if(salFilterMode==='month') renderMonthlyBreakdown();
-}
-
-function renderMonthlyBreakdown(){
-  var mo=document.getElementById('sal-month-pick').value||new Date().toISOString().slice(0,7);
-  var allE=getEntries().filter(function(e){return e.salonId===mySalonId;});
-  var salonEntries=filterByMonth(allE,mo);
-  var staff=(LS.get('staff')||[]).filter(function(u){return u.salonId===mySalonId&&u.role==='barber';});
-  var yr=parseInt(mo.split('-')[0]),m=parseInt(mo.split('-')[1]);
-  var daysInMonth=new Date(yr,m,0).getDate();
-  var mName=new Date(yr,m-1,1).toLocaleString('default',{month:'long',year:'numeric'});
-  var totM   =salonEntries.reduce(function(a,e){return a+Number(e.phPay||0)+Number(e.cash||0);},0);
-  var totPh  =salonEntries.reduce(function(a,e){return a+Number(e.phPay||0);},0);
-  var totCash=salonEntries.reduce(function(a,e){return a+Number(e.cash||0);},0);
-  var totPhTip  =salonEntries.reduce(function(a,e){return a+Number(e.phTip||0);},0);
-  var totCashTip=salonEntries.reduce(function(a,e){return a+Number(e.cashTip||0);},0);
-  document.getElementById('sal-mon-stats').innerHTML=
-    '<div class="sg">'+
-    '<div class="sc" style="border-left:3px solid var(--accent)"><div class="sc-lbl">Month Sales</div><div class="sc-val" style="font-size:18px;color:var(--accent)">'+fmtINR(totM)+'</div></div>'+
-    '<div class="sc b"><div class="sc-lbl">PhonePe</div><div class="sc-val" style="font-size:18px">'+fmtINR(totPh)+'</div></div>'+
-    '<div class="sc gr"><div class="sc-lbl">Cash</div><div class="sc-val" style="font-size:18px">'+fmtINR(totCash)+'</div></div>'+
-    '<div class="sc warn"><div class="sc-lbl">Ph Tips</div><div class="sc-val" style="font-size:18px">'+fmtINR(totPhTip)+'</div></div>'+
-    '<div class="sc warn"><div class="sc-lbl">Cash Tips</div><div class="sc-val" style="font-size:18px">'+fmtINR(totCashTip)+'</div></div>'+
-    '<div class="sc a"><div class="sc-lbl">Customers</div><div class="sc-val">'+salonEntries.length+'</div></div>'+
-    '<div class="sc g"><div class="sc-lbl">Daily Avg</div><div class="sc-val" style="font-size:18px">'+fmtINR(Math.round(totM/daysInMonth))+'</div></div>'+
-    '</div>';
-  var dayTotals=[];
-  for(var d=1;d<=daysInMonth;d++){
-    var ds=d+'/'+m+'/'+yr;
-    var t=salonEntries.filter(function(e){return e.date===ds;}).reduce(function(a,e){return a+Number(e.phPay||0)+Number(e.cash||0);},0);
-    dayTotals.push({day:d,tot:t});
-  }
-  var maxT=Math.max.apply(null,dayTotals.map(function(x){return x.tot;}));if(maxT===0)maxT=1;
-  document.getElementById('sal-mon-chart').innerHTML=
-    '<div class="month-chart"><div class="chart-title">Daily Sales — '+mName+'</div>'+
-    '<div class="bar-chart">'+dayTotals.map(function(d){
-      return '<div class="bar-group"><div class="bar" style="height:'+Math.max(3,Math.round((d.tot/maxT)*100))+'%" data-tip="'+fmtINR(d.tot)+'"></div><div class="bar-lbl">'+d.day+'</div></div>';
-    }).join('')+'</div></div>';
-  document.getElementById('sal-mon-barbers').innerHTML=staff.map(function(u){
-    var ue=salonEntries.filter(function(e){return e.barberId===u.id;});
-    var uph  =ue.reduce(function(a,e){return a+Number(e.phPay||0);},0);
-    var uca  =ue.reduce(function(a,e){return a+Number(e.cash||0);},0);
-    var uphTip =ue.reduce(function(a,e){return a+Number(e.phTip||0);},0);
-    var ucaTip =ue.reduce(function(a,e){return a+Number(e.cashTip||0);},0);
-    var init=u.name.split(' ').map(function(w){return w[0];}).join('').slice(0,2).toUpperCase();
-    return '<div class="br-report">'+
-      '<div class="br-header"><div class="br-ava">'+init+'</div>'+
-      '<div><div class="br-name">'+u.name+'</div><div class="br-count">Customers: '+ue.length+'</div></div></div>'+
-      '<div class="br-stats">'+
-        '<div class="br-stat ph"><div class="br-stat-lbl">PhonePe</div><div class="br-stat-val">'+fmtINR(uph)+'</div></div>'+
-        '<div class="br-stat cash"><div class="br-stat-lbl">Cash</div><div class="br-stat-val">'+fmtINR(uca)+'</div></div>'+
-        '<div class="br-stat tip"><div class="br-stat-lbl">Ph Tip</div><div class="br-stat-val">'+fmtINR(uphTip)+'</div></div>'+
-        '<div class="br-stat tip"><div class="br-stat-lbl">Cash Tip</div><div class="br-stat-val">'+fmtINR(ucaTip)+'</div></div>'+
-        '<div class="br-stat tot"><div class="br-stat-lbl">Total</div><div class="br-stat-val">'+fmtINR(uph+uca)+'</div></div>'+
-      '</div></div>';
-  }).join('')||'<div style="color:var(--muted);font-size:13px">No hairstylists.</div>';
-}
-
 // ── YEARLY ──
-function renderYearly(){
-  var yr=parseInt(document.getElementById('yr-year').value)||new Date().getFullYear();
-  var allE=getEntries().filter(function(e){return e.salonId===mySalonId;});
-  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var rows=''; var tPh=0,tCash=0,tPhTip=0,tCashTip=0,tS=0,tC=0;
-  for(var m=1;m<=12;m++){
-    var mo=yr+'-'+(m<10?'0':'')+m;
-    var me=filterByMonth(allE,mo);
-    var ph     =me.reduce(function(a,e){return a+Number(e.phPay||0);},0);
-    var cash   =me.reduce(function(a,e){return a+Number(e.cash||0);},0);
-    var phTip  =me.reduce(function(a,e){return a+Number(e.phTip||0);},0);
-    var cashTip=me.reduce(function(a,e){return a+Number(e.cashTip||0);},0);
-    var sal=ph+cash; var custs=me.length;
-    tPh+=ph;tCash+=cash;tPhTip+=phTip;tCashTip+=cashTip;tS+=sal;tC+=custs;
-    rows+='<tr>'+
-      '<td>'+months[m-1]+' '+yr+'</td>'+
-      '<td style="color:var(--accent)">'+custs+'</td>'+
-      '<td style="color:var(--blue)">'+fmtINR(ph)+'</td>'+
-      '<td style="color:var(--green)">'+fmtINR(cash)+'</td>'+
-      '<td style="color:var(--warn)">'+(phTip>0?fmtINR(phTip):'—')+'</td>'+
-      '<td style="color:var(--warn)">'+(cashTip>0?fmtINR(cashTip):'—')+'</td>'+
-      '<td style="color:var(--gold);font-weight:700">'+fmtINR(sal)+'</td>'+
-    '</tr>';
-  }
-  rows+='<tr><td>TOTAL '+yr+'</td>'+
-    '<td style="color:var(--accent)">'+tC+'</td>'+
-    '<td style="color:var(--blue)">'+fmtINR(tPh)+'</td>'+
-    '<td style="color:var(--green)">'+fmtINR(tCash)+'</td>'+
-    '<td style="color:var(--warn)">'+fmtINR(tPhTip)+'</td>'+
-    '<td style="color:var(--warn)">'+fmtINR(tCashTip)+'</td>'+
-    '<td style="color:var(--gold)">'+fmtINR(tS)+'</td></tr>';
-  document.getElementById('yr-body').innerHTML=rows;
-  document.getElementById('yr-summary-stats').innerHTML=
-    '<div class="sc" style="border-left:3px solid var(--accent)"><div class="sc-lbl">Year Customers</div><div class="sc-val">'+tC+'</div></div>'+
-    '<div class="sc g"><div class="sc-lbl">Year Sales</div><div class="sc-val" style="font-size:18px">'+fmtINR(tS)+'</div></div>'+
-    '<div class="sc"><div class="sc-lbl">Ph Tips</div><div class="sc-val" style="font-size:18px;color:var(--warn)">'+fmtINR(tPhTip)+'</div></div>'+
-    '<div class="sc"><div class="sc-lbl">Cash Tips</div><div class="sc-val" style="font-size:18px;color:var(--warn)">'+fmtINR(tCashTip)+'</div></div>';
-}
-
 // ── STAFF TAB ──
 var lastStaffPIN = '';
 var editingStaffId = null;
@@ -1511,16 +1136,6 @@ function renderDashboard(){
 
 // ── SALES ──
 var salFilterMode='day';
-function setSalesFilter(mode){
-  salFilterMode=mode;
-  document.getElementById('ft-day').classList.toggle('on',mode==='day');
-  document.getElementById('ft-mon').classList.toggle('on',mode==='month');
-  document.getElementById('sal-day-filter').style.display   =mode==='day'?'flex':'none';
-  document.getElementById('sal-month-filter').style.display =mode==='month'?'flex':'none';
-  document.getElementById('sal-monthly-wrap').style.display =mode==='month'?'block':'none';
-  renderSales();
-  if(mode==='month') renderMonthlyBreakdown();
-}
 function renderSales(){
   var allE=getEntries().filter(function(e){return e.salonId===mySalonId;});
   var entries=[];
