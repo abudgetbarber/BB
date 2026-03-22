@@ -43,6 +43,7 @@ input::placeholder{color:#AAAAAA}
   </div>
   <h2>Barber Portal</h2>
   <p class="sub">Enter your phone number and 4-digit PIN</p>
+  <div id="fetchStatus" style="display:none;font-size:12px;text-align:center;margin-bottom:8px;padding:6px"></div>
   <div id="errMsg" class="err">Wrong phone or PIN. Please try again.</div>
   <div class="fg">
     <label>Mobile Number</label>
@@ -54,8 +55,6 @@ input::placeholder{color:#AAAAAA}
   </div>
   
   <!-- Restore from Sheets (shown when no local data) -->
-  <div id="restore-section" style="display:none;margin-top:16px;background:rgba(0,61,43,.06);border:1.5px solid rgba(0,61,43,.2);border-radius:10px;padding:12px;text-align:center">
-    <div id="restore-status" style="font-size:13px;color:#767668;line-height:1.5">⬇ Loading staff data…</div>
   </div>
     <div style="font-size:12px;color:#767668;margin-bottom:10px;line-height:1.5">Paste your salon's Google Sheets URL to load staff data, then log in normally.</div>
     
@@ -67,126 +66,112 @@ input::placeholder{color:#AAAAAA}
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
 <script>
-// Ensure Sheet URL is always set
-(function(){
-  var SHEET_URL='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
-  if(!localStorage.getItem('bb_sheetUrl')&&SHEET_URL)
-    localStorage.setItem('bb_sheetUrl',SHEET_URL);
-})();
 
-// Auto-fetch latest data from Google Sheets before login check
-// This ensures PINs are always current from any device
-function fetchLatestAndLogin(loginFn) {
-  var url = localStorage.getItem('bb_sheetUrl') || 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
-  if (!url) { loginFn(); return; }
-  
-  var cbName = '_bbLogin' + Date.now();
-  var script = document.createElement('script');
+var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
+
+// ── Step 1: On page load, always fetch latest staff/customers from Sheets ──
+// This runs immediately so data is ready by the time user types their PIN
+var _dataReady = false;
+var _fetchDone = false;
+
+(function loadFromSheets(){
+  var cbName = '_ls' + Date.now();
+  var s = document.createElement('script');
   var done = false;
-  var errEl = document.getElementById('errMsg');
-  
-  // Show loading state briefly
-  var loginBtn = document.getElementById('loginBtn');
-  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Checking…'; }
-  
-  var timer = setTimeout(function() {
-    if (done) return; done = true;
-    delete window[cbName];
-    if (script.parentNode) document.head.removeChild(script);
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login →'; }
-    loginFn(); // timeout = proceed anyway with local data
-  }, 12000);
-  
-  window[cbName] = function(json) {
-    if (done) return; done = true;
-    clearTimeout(timer);
-    delete window[cbName];
-    if (script.parentNode) document.head.removeChild(script);
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login →'; }
-    try {
-      if (json && json.ok && json.data) {
-        var d = json.data;
-        if (d.staff      && d.staff.length)     localStorage.setItem('bb_staff',     JSON.stringify(d.staff));
-        if (d.customers  && d.customers.length)  localStorage.setItem('bb_customers', JSON.stringify(d.customers));
-        if (d.salons     && d.salons.length)     localStorage.setItem('bb_salons',    JSON.stringify(d.salons));
-      }
-    } catch(e) {}
-    loginFn();
-  };
-  
-  script.onerror = function() {
-    if (done) return; done = true;
-    clearTimeout(timer);
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login →'; }
-    loginFn();
-  };
-  
-  script.src = url + '?action=read&callback=' + cbName;
-  document.head.appendChild(script);
-}
 
-function doLogin(){
-  var phone=document.getElementById('phoneInput').value.trim();
-  var pin  =document.getElementById('pinInput').value.trim();
-  var errEl=document.getElementById('errMsg');
-  if(phone.length<8){errEl.textContent='Enter a valid phone number';errEl.style.display='block';document.getElementById('phoneInput').focus();return;}
-  if(pin.length<4){errEl.textContent='Enter your 4-digit PIN';errEl.style.display='block';document.getElementById('pinInput').focus();return;}
-  try{
-    var staffList=JSON.parse(localStorage.getItem('bb_staff'))||[];
-    var sm=staffList.find(function(u){return u.phone===phone&&u.role==='barber';});
-    if(!sm){errEl.textContent='Phone not registered as a Barber. Contact your manager.';errEl.style.display='block';return;}
-    if(!sm.loginOtp||sm.loginOtp!==pin){errEl.textContent='Wrong PIN. Try again.';errEl.style.display='block';document.getElementById('pinInput').value='';document.getElementById('pinInput').focus();return;}
-    errEl.style.display='none';
-    sessionStorage.setItem('bb_role','barber');
-    sessionStorage.setItem('bb_phone',phone);
-    sessionStorage.setItem('bb_name',sm.name||'Barber');
-    window.location.href='app-barber.html';
-  }catch(e){errEl.textContent='Login error. Please try again.';errEl.style.display='block';}
-}
-document.addEventListener('keydown',function(e){if(e.key==='Enter')fetchLatestAndLogin(doLogin);});
+  var timer = setTimeout(function(){
+    if(done) return; done = true;
+    _fetchDone = true;
+    delete window[cbName];
+    if(s.parentNode) document.head.removeChild(s);
+    setStatus('⚠ Could not reach server — login with cached data if available', 'warn');
+    enableLogin();
+  }, 15000);
 
-// ── AUTO-RESTORE: fetch data on page load if no local data ──
-(function(){
-  var hasData=localStorage.getItem('bb_staff')||localStorage.getItem('bb_customers');
-  if(hasData)return;
-  var el=document.getElementById('restore-section');
-  var st=document.getElementById('restore-status');
-  if(el)el.style.display='block';
-  var url='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
-  var cbName='_autoR'+Date.now(),s=document.createElement('script'),done=false;
-  var timer=setTimeout(function(){
-    if(done)return;done=true;delete window[cbName];
-    if(s.parentNode)document.head.removeChild(s);
-    if(st)st.textContent='⚠ Could not reach server. Check internet and try again.';
-  },20000);
-  window[cbName]=function(json){
-    if(done)return;done=true;clearTimeout(timer);delete window[cbName];
-    if(s.parentNode)document.head.removeChild(s);
+  window[cbName] = function(json){
+    if(done) return; done = true;
+    clearTimeout(timer);
+    _fetchDone = true;
+    delete window[cbName];
+    if(s.parentNode) document.head.removeChild(s);
     try{
-      if(!json||!json.ok||!json.data)throw new Error('No data');
-      var d=json.data;
-      if(d.staff     &&d.staff.length)     localStorage.setItem('bb_staff',    JSON.stringify(d.staff));
-      if(d.salons    &&d.salons.length)    localStorage.setItem('bb_salons',   JSON.stringify(d.salons));
-      if(d.customers &&d.customers.length) localStorage.setItem('bb_customers',JSON.stringify(d.customers));
-      if(d.entries   &&d.entries.length)   localStorage.setItem('bb_entries',  JSON.stringify(d.entries));
-      if(d.cashIn    &&d.cashIn.length)    localStorage.setItem('bb_cashIn',   JSON.stringify(d.cashIn));
-      if(d.expenses  &&d.expenses.length)  localStorage.setItem('bb_expenses', JSON.stringify(d.expenses));
-      if(d.attendance&&d.attendance.length)localStorage.setItem('bb_attendance',JSON.stringify(d.attendance));
-      if(d.styleCards&&d.styleCards.length)localStorage.setItem('bb_styleCards',JSON.stringify(d.styleCards));
-      if(d.visits    &&d.visits.length)    localStorage.setItem('bb_visits',   JSON.stringify(d.visits));
-      localStorage.setItem('bb_sheetUrl',url);
-      if(el)el.style.display='none';
+      if(json && json.ok && json.data){
+        var d = json.data;
+        if(d.staff     && d.staff.length)     localStorage.setItem('bb_staff',     JSON.stringify(d.staff));
+        if(d.customers && d.customers.length)  localStorage.setItem('bb_customers', JSON.stringify(d.customers));
+        if(d.salons    && d.salons.length)     localStorage.setItem('bb_salons',    JSON.stringify(d.salons));
+        localStorage.setItem('bb_sheetUrl', SHEET_URL);
+        _dataReady = true;
+        setStatus('', '');
+      } else {
+        setStatus('⚠ Sheets returned no data — using cached data', 'warn');
+      }
     }catch(e){
-      if(st)st.textContent='❌ '+e.message;
+      setStatus('⚠ Error loading data: ' + e.message, 'warn');
     }
+    enableLogin();
   };
-  s.onerror=function(){
-    if(done)return;done=true;clearTimeout(timer);
-    if(st)st.textContent='❌ Network error — check internet.';
+
+  s.onerror = function(){
+    if(done) return; done = true;
+    clearTimeout(timer);
+    _fetchDone = true;
+    delete window[cbName];
+    if(s.parentNode) document.head.removeChild(s);
+    setStatus('⚠ Network error — login with cached data if available', 'warn');
+    enableLogin();
   };
-  s.src=url+'?action=read&callback='+cbName;
+
+  s.src = SHEET_URL + '?action=read&callback=' + cbName;
   document.head.appendChild(s);
+
+  // Disable login button while fetching
+  disableLogin('⏳ Loading staff data…');
 })();
+
+function disableLogin(msg){
+  var btn = document.getElementById('loginBtn');
+  if(btn){ btn.disabled = true; btn.textContent = msg; }
+}
+
+function enableLogin(){
+  var btn = document.getElementById('loginBtn');
+  if(btn){ btn.disabled = false; btn.textContent = 'Login →'; }
+}
+
+function setStatus(msg, type){
+  var el = document.getElementById('fetchStatus');
+  if(!el) return;
+  if(!msg){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.style.color = type === 'warn' ? '#DC2626' : '#003D2B';
+  el.textContent = msg;
+}
+
+// ── Step 2: Login check ──
+function doLogin(){
+  var phone = document.getElementById('phoneInput').value.trim();
+  var pin   = document.getElementById('pinInput').value.trim();
+  var errEl = document.getElementById('errMsg');
+
+  if(phone.length < 8){ errEl.textContent='Enter a valid phone number'; errEl.style.display='block'; return; }
+  if(pin.length < 4){   errEl.textContent='Enter your 4-digit PIN';    errEl.style.display='block'; return; }
+
+  errEl.style.display = 'none';
+
+    var staffList = JSON.parse(localStorage.getItem('bb_staff')) || [];
+  var sm = staffList.find(function(u){ return u.phone===phone && u.role==='barber'; });
+  if(!sm){ errEl.textContent='Phone not registered as Barber — check with admin'; errEl.style.display='block'; return; }
+  if(!sm.loginOtp || sm.loginOtp !== pin){ errEl.textContent='Wrong PIN. Try again.'; errEl.style.display='block'; document.getElementById('pinInput').value=''; return; }
+  sessionStorage.setItem('bb_role','barber');
+  sessionStorage.setItem('bb_phone', phone);
+  sessionStorage.setItem('bb_name', sm.name||'Barber');
+  window.location.href = 'app-barber.html';
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Enter' && !document.getElementById('loginBtn').disabled) doLogin();
+});
 
 </script>
 </body>
