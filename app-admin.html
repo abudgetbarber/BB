@@ -1449,6 +1449,70 @@ function downloadCSV(type){
   a.download='BB_'+type+'_'+month+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);
   toast('✅ CSV downloaded');
 }
+async function syncAllData(){
+  var url=LS.get('sheetUrl')||BB_SHEET_URL;
+  if(!url){toast('⚠ No Apps Script URL');return;}
+  showSyncStatus('⬆ Syncing to Google Sheets…','loading');
+  var sheets={
+    Entries:    LS.get('entries')   ||[],
+    Staff:      LS.get('staff')     ||[],
+    Salons:     LS.get('salons')    ||[],
+    Customers:  LS.get('customers') ||[],
+    CashIn:     LS.get('cashIn')    ||[],
+    Expenses:   LS.get('expenses')  ||[],
+    Attendance: LS.get('attendance')||[],
+    StyleCards: (LS.get('styleCards')||[]).map(function(c){
+      return{id:c.id,cardId:c.cardId,customerId:c.customerId,barberId:c.barberId,
+        salonId:c.salonId,name:c.name,createdAt:c.createdAt,topLength:c.topLength,
+        texture:c.texture,fade:c.fade,guard:c.guard,neckline:c.neckline,
+        beard:c.beard,product:c.product,notes:c.notes,
+        zoneFront:c.zones?c.zones.front:'',zoneTop:c.zones?c.zones.top:'',
+        zoneCrown:c.zones?c.zones.crown:'',zoneLeft:c.zones?c.zones.left:'',
+        zoneRight:c.zones?c.zones.right:'',zoneBack:c.zones?c.zones.back:''};
+    }),
+    Visits:      LS.get('visits')    ||[],
+    Advances:    LS.get('advances')  ||[],
+    MgrCashIn:   LS.get('mgrCashIn') ||[],
+    MgrExpenses: LS.get('mgrExpenses')||[],
+    Deductions:(function(){
+      var r=[];try{Object.keys(localStorage).forEach(function(k){
+        if(k.startsWith('bb_ded_')){
+          var p=k.replace('bb_ded_','').split('_'),sid=p[0],mo=p.slice(1).join('_');
+          (JSON.parse(localStorage.getItem(k))||[]).forEach(function(d){r.push({staffId:sid,month:mo,desc:d.desc,amount:d.amount});});
+        }
+      });}catch(e){}return r;
+    })(),
+    AttOverrides:(function(){
+      var r=[];try{Object.keys(localStorage).forEach(function(k){
+        if(k.startsWith('bb_att_')){
+          var p=k.replace('bb_att_','').split('_'),sid=p[0],mo=p.slice(1).join('_');
+          var v=JSON.parse(localStorage.getItem(k))||{};
+          r.push({staffId:sid,month:mo,present:v.present||0,half:v.half||0,absent:v.absent||0});
+        }
+      });}catch(e){}return r;
+    })()
+  };
+  var names=Object.keys(sheets),done=0,errors=0;
+  function next(){
+    if(done>=names.length){
+      if(errors===0){
+        showSyncStatus('✅ All data synced!','ok');
+        toast('✅ Synced to Sheets');
+        var el=document.getElementById('lastSyncTime');
+        if(el)el.textContent='Synced '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      }else{
+        showSyncStatus('⚠ Some sheets may have failed — retry','err');
+      }
+      return;
+    }
+    var name=names[done],rows=sheets[name];done++;
+    if(!rows.length){next();return;}
+    showSyncStatus('⬆ Syncing '+name+'… ('+done+'/'+names.length+')','loading');
+    syncSheet(url,name,rows,function(ok){if(!ok)errors++;next();});
+  }
+  next();
+}
+  
 function applyRestoredData(d){
   var toStr=function(rec,fields){
     if(!rec)return rec;
