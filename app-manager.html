@@ -610,7 +610,7 @@ body{font-family:var(--BF);background:var(--bg);color:var(--white);font-size:15p
 
 <script>
 
-var BB_SHEET_URL = 'https://script.google.com/macros/s/AKfycbwaTYPcStdiRKSNVT-tQCwyUWpeeQyRLgBkMceWxq_U20ATRw-bu6BKCWwqVCuK6E05/exec';
+var BB_SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
 // ── DIRECT SHEETS WRITE (single row) ──
 function appendRowToSheet(sheetName, rowObj, onDone){
@@ -688,7 +688,7 @@ var LS = {
 };
 
 // Ensure Sheet URL is always configured
-(function(){var U='https://script.google.com/macros/s/AKfycbwaTYPcStdiRKSNVT-tQCwyUWpeeQyRLgBkMceWxq_U20ATRw-bu6BKCWwqVCuK6E05/exec';if(!localStorage.getItem('bb_sheetUrl')&&U)localStorage.setItem('bb_sheetUrl',U);if(!LS.get('sheetUrl')&&U)LS.set('sheetUrl',U);})();
+(function(){var U='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';if(!localStorage.getItem('bb_sheetUrl')&&U)localStorage.setItem('bb_sheetUrl',U);if(!LS.get('sheetUrl')&&U)LS.set('sheetUrl',U);})();
 // ── HELPERS ──
 function today(){ return new Date().toLocaleDateString('en-IN'); }
 function todayISO(){ return new Date().toISOString().split('T')[0]; }
