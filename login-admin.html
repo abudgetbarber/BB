@@ -62,17 +62,12 @@ input::placeholder{color:#AAAAAA}
 </div>
 
 <script>
-// 🔥 Clean any existing storage (avoid conflicts)
-(function(){
-  try {
-    localStorage.clear();
-    sessionStorage.clear();
-  } catch(e){}
-})();
+// 🔗 Google Sheet URL (for future use, not for login)
+var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ✅ Fixed Admin Credentials
-var ADMIN_PIN   = '2691';
-var ADMIN_PHONE = '9999999999'; // 👈 change this to your admin number
+// 🔐 HARDCODED ADMIN
+var ADMIN_PHONE = '9876543210';  // 👉 change
+var ADMIN_PIN   = '2691';        // 👉 change
 
 function doLogin(){
   var phone = document.getElementById('phoneInput').value.trim();
@@ -80,7 +75,7 @@ function doLogin(){
   var errEl = document.getElementById('errMsg');
 
   if(phone.length < 8){
-    errEl.textContent = 'Enter a valid phone number';
+    errEl.textContent = 'Enter valid phone number';
     errEl.style.display = 'block';
     return;
   }
@@ -91,30 +86,30 @@ function doLogin(){
     return;
   }
 
-  // 🔒 Strict match (no sheet, no storage)
+  // 🔐 ONLY HARDCODED LOGIN (Sheet ignored)
   if(phone !== ADMIN_PHONE || pin !== ADMIN_PIN){
-    errEl.textContent = 'Invalid Admin Credentials';
+    errEl.textContent = 'Invalid phone or PIN';
     errEl.style.display = 'block';
-    document.getElementById('pinInput').value = '';
     return;
   }
 
-  // ✅ Fresh session
+  // ✅ Success
   sessionStorage.clear();
-
   sessionStorage.setItem('bb_role', 'admin');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', 'Admin');
 
   errEl.style.display = 'none';
+
   window.location.href = 'app-admin.html';
 }
 
-// Enter key support
+// ⌨️ Enter key login
 document.addEventListener('keydown', function(e){
   if(e.key === 'Enter') doLogin();
 });
 </script>
+
   
 </body>
 </html>
