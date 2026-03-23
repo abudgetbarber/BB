@@ -82,53 +82,47 @@ function loginBarber(){
     const pin = document.getElementById('pinInput').value.trim();
 
     if(!/^\d{10}$/.test(phone)){
-        showError('Enter a valid 10-digit phone number');
-        return;
+        return showError('Enter valid 10-digit phone');
     }
     if(!/^\d{4}$/.test(pin)){
-        showError('Enter a 4-digit PIN');
-        return;
+        return showError('Enter 4-digit PIN');
     }
 
     fetch(SHEET_URL)
     .then(res => res.json())
-    .then(data => {
-        // Convert Google Sheet JSON structure to array of objects
-        let staff = [];
+    .then(staff => {
 
-        if(Array.isArray(data)){
-            staff = data; // Already an array of objects
-        } else if(Array.isArray(data.values)){
-            const rows = data.values;
-            const headers = rows[0].map(h => h.trim());
-            for(let i = 1; i < rows.length; i++){
-                const row = rows[i];
-                let obj = {};
-                headers.forEach((key,index) => obj[key] = row[index]);
-                staff.push(obj);
-            }
+        if(!Array.isArray(staff) || staff.length === 0){
+            throw new Error('Staff sheet empty or not loading');
         }
 
-        if(staff.length === 0){
-            throw new Error('No barber data found in Staff sheet');
-        }
+        // DEBUG (you can remove later)
+        console.log("Staff Data:", staff);
 
-        const user = staff.find(u => (u.phone === phone) && (u.role.toLowerCase() === 'barber'));
+        const user = staff.find(u =>
+            String(u.phone).trim() === phone &&
+            String(u.role).toLowerCase().trim() === 'barber'
+        );
+
         if(!user){
-            showError('Phone not registered as a Barber. Contact your manager.');
-            return;
-        }
-        if(user.loginPin !== pin){
-            showError('Wrong PIN. Try again.');
-            return;
+            return showError('Barber not found. Check phone.');
         }
 
+        if(String(user.loginPin).trim() !== pin){
+            return showError('Wrong PIN');
+        }
+
+        sessionStorage.clear(); // clean session
         sessionStorage.setItem('bb_role','barber');
         sessionStorage.setItem('bb_phone', phone);
         sessionStorage.setItem('bb_name', user.name || 'Barber');
+
         window.location.href = 'app-barber.html';
     })
-    .catch(err => showError('Unable to fetch staff data: ' + err.message));
+    .catch(err => {
+        console.error(err);
+        showError('Connection failed. Check sheet/web app.');
+    });
 }
 
 function showError(msg){
@@ -137,7 +131,9 @@ function showError(msg){
     errEl.style.display = 'block';
 }
 
-document.addEventListener('keydown', e => { if(e.key === 'Enter') loginBarber(); });
+document.addEventListener('keydown', e => {
+    if(e.key === 'Enter') loginBarber();
+});
 </script>
 </body>
 </html>
