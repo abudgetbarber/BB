@@ -52,84 +52,70 @@ input::placeholder{color:#AAAAAA}
     <label for="pinInput">PIN</label>
     <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
-  <button id="loginBtn" class="btn btn-primary">Login</button>
+  <button class="btn btn-primary" id="loginBtn">Login</button>
 </div>
 
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// Normalize phone (last 10 digits only)
 function cleanPhone(p){
-  const digits = String(p || '').replace(/\D/g, '');
-  return digits.slice(-10);
+  return String(p||'').replace(/\D/g,'').slice(-10);
 }
 
-async function doLogin() {
-  const phone = document.getElementById('phoneInput')?.value.trim();
-  const pin   = document.getElementById('pinInput')?.value.trim();
+function showError(msg, show=true){
+  const el = document.getElementById('errMsg');
+  el.style.display = show ? 'block' : 'none';
+  el.textContent = msg;
+}
 
-  if (!phone || cleanPhone(phone).length < 10) {
-    return showError('Enter valid phone');
-  }
-  if (!pin || pin.length < 4) {
-    return showError('Enter 4-digit PIN');
-  }
+async function doLogin(){
+  const phone = document.getElementById('phoneInput').value.trim();
+  const pin = document.getElementById('pinInput').value.trim();
+
+  if(!phone || cleanPhone(phone).length<10) return showError('Enter valid phone');
+  if(!pin || pin.length<4) return showError('Enter 4-digit PIN');
 
   showError('Checking...', true);
 
-  try {
-    const res = await fetch(SHEET_URL + '?t=' + Date.now());
+  try{
+    const res = await fetch(SHEET_URL+'?t='+Date.now());
     const text = await res.text();
+    const parsed = JSON.parse(text);
 
-    console.log("RAW RESPONSE:", text);
-
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch(e) {
-      console.error("NOT JSON:", text);
-      return showError('Server not returning JSON');
-    }
-
-    // ✅ Extract staff array safely
+    // ✅ Access staff array
     const staffList = Array.isArray(parsed?.data?.staff) ? parsed.data.staff : [];
-    if (!staffList.length) return showError('No staff data found');
+    if(!staffList.length) return showError('No staff data found');
 
-    const user = staffList.find(u => cleanPhone(u.phone) === cleanPhone(phone));
-    if (!user) return showError('Staff not registered');
-    if (!user.loginPin) return showError('PIN not set');
-    if (String(pin).trim() !== String(user.loginPin).trim()) return showError('Wrong PIN');
+    const user = staffList.find(u => cleanPhone(u.phone)===cleanPhone(phone));
+    if(!user) return showError('Staff not registered');
+    if(!user.loginPin) return showError('PIN not set');
+    if(String(pin).trim()!==String(user.loginPin).trim()) return showError('Wrong PIN');
 
-    // ✅ Save session
-    localStorage.setItem('bb_role', 'barber'); // keep role as barber
-    localStorage.setItem('bb_phone', cleanPhone(phone));
-    localStorage.setItem('bb_name', user.name || 'Barber');
+    // ✅ Save session before redirect
+    localStorage.setItem('bb_role','barber');
+    localStorage.setItem('bb_phone',cleanPhone(phone));
+    localStorage.setItem('bb_name',user.name||'Barber');
 
     showError('', false);
+    window.location.replace('app-barber.html');
 
-    // ✅ Redirect to app page
-    window.location.href = 'app-barber.html';
-
-  } catch (err) {
+  }catch(err){
     console.error(err);
     showError('Network error');
   }
 }
 
-function showError(msg, show = true){
-  const el = document.getElementById('errMsg');
-  if (!el) return;
-  el.style.display = show ? 'block' : 'none';
-  el.textContent = msg;
-}
+// ✅ Event listeners
+document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
-document.addEventListener("DOMContentLoaded", function () {
-  document.getElementById("loginBtn")?.addEventListener("click", doLogin);
-});
-
-document.addEventListener("keydown", function(e){
-  if (e.key === "Enter") doLogin();
+// ✅ Auto redirect if already logged in
+document.addEventListener('DOMContentLoaded', ()=>{
+  if(localStorage.bb_phone){
+    window.location.replace('app-barber.html');
+  }
 });
 </script>
+
 </body>
 </html>
