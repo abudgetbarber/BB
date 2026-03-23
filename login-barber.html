@@ -90,41 +90,38 @@ async function doLogin() {
     const res = await fetch(SHEET_URL + '?t=' + Date.now());
     const text = await res.text();
 
-    let response;
+    let data;
 
     try {
-      response = JSON.parse(text);
+      data = JSON.parse(text);
     } catch(e) {
-      console.error("RAW:", text);
-      return showError('Server error');
+      console.error("NOT JSON:", text);
+      return showError('Server not returning JSON');
     }
 
-    // ✅ 🔥 FIX FOR YOUR API
-    let data = Array.isArray(response) ? response : response.data;
-
+    // ✅ HANDLE FORMAT
     if (!Array.isArray(data)) {
-      console.error("FORMAT:", response);
-      return showError('Invalid data format');
+      if (data.data && Array.isArray(data.data)) {
+        data = data.data;
+      } else {
+        console.error("FORMAT ERROR:", data);
+        return showError('Invalid data format');
+      }
     }
 
     const user = data.find(u =>
       cleanPhone(u.phone) === cleanPhone(phone) &&
-      String(u.role || '').toLowerCase().trim() === 'barber'
+      String(u.role).toLowerCase().trim() === 'barber'
     );
 
-    if (!user) {
-      return showError('Not registered');
-    }
+    if (!user) return showError('Not registered');
 
-    if (!user.loginPin) {
-      return showError('PIN not set. Contact admin.');
-    }
+    if (!user.loginPin) return showError('PIN not set');
 
     if (String(pin) !== String(user.loginPin).trim()) {
       return showError('Wrong PIN');
     }
 
-    // ✅ SUCCESS
     localStorage.setItem('bb_role', 'barber');
     localStorage.setItem('bb_phone', cleanPhone(phone));
     localStorage.setItem('bb_name', user.name || 'Barber');
@@ -140,20 +137,14 @@ async function doLogin() {
 }
 
 function showError(msg, show = true){
-  const errEl = document.getElementById('errMsg');
-  if (!errEl) return;
-
-  if (show) {
-    errEl.textContent = msg;
-    errEl.style.display = 'block';
-  } else {
-    errEl.style.display = 'none';
-  }
+  const el = document.getElementById('errMsg');
+  if (!el) return;
+  el.style.display = show ? 'block' : 'none';
+  el.textContent = msg;
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  const btn = document.getElementById("loginBtn");
-  if (btn) btn.addEventListener("click", doLogin);
+  document.getElementById("loginBtn")?.addEventListener("click", doLogin);
 });
 
 document.addEventListener("keydown", function(e){
