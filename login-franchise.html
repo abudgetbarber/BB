@@ -149,7 +149,7 @@ function doLogin() {
   if(pin.length < 4){   errEl.textContent='Enter your 4-digit PIN';    errEl.style.display='block'; return; }
   errEl.style.display = 'none';
   var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
-  var sm = staffList.find(function(u){ return u.phone===phone && u.role==='franchise'; });
+  var sm = staffList.find(function(u){ return String(u.phone)===phone && u.role==='franchise'; });
   if(!sm){ errEl.textContent='Phone not registered as Franchise Owner — contact admin'; errEl.style.display='block'; return; }
   if(!sm.loginPin || String(sm.loginPin) !== String(pin)){ errEl.textContent='Wrong PIN. Try again.'; errEl.style.display='block'; document.getElementById('pinInput').value=''; return; }
   sessionStorage.setItem('bb_role','franchise');
