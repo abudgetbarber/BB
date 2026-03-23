@@ -30,6 +30,13 @@ input::placeholder{color:#AAAAAA}
 .btn-secondary{background:transparent;border:2px solid #E0E0D8;color:#767668;margin-top:10px}
 .btn-secondary:hover{border-color:#004F38;color:#004F38}
 .err{color:#DC2626;font-size:13px;font-weight:600;text-align:center;margin-bottom:12px;display:none}
+
+@media(max-width:400px){
+  .card{padding:24px 16px;}
+  .logo-text{font-size:28px;}
+  h2{font-size:20px;}
+  input[type="tel"],input[type="password"]{padding:12px 10px;font-size:16px;}
+}
 </style>
 </head>
 <body>
@@ -43,7 +50,7 @@ input::placeholder{color:#AAAAAA}
   </div>
   <h2>Barber Portal</h2>
   <p class="sub">Enter your phone number and 4-digit PIN</p>
-  <div id="errMsg" class="err">Wrong phone or PIN. Please try again.</div>
+  <div id="errMsg" class="err"></div>
   <div class="fg">
     <label>Mobile Number</label>
     <input type="tel" id="phoneInput" placeholder="Your 10-digit mobile number" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
@@ -52,33 +59,93 @@ input::placeholder{color:#AAAAAA}
     <label>PIN</label>
     <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
-  <button class="btn btn-primary" id="loginBtn" onclick="fetchLatestAndLogin(doLogin)">Login →</button>
+  <button class="btn btn-primary" onclick="fetchLatestAndLogin()">Login →</button>
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
+
 <script>
-// Ensure Sheet URL is always set
-var SHEET_URL='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-function doLogin(){
-  var phone=document.getElementById('phoneInput').value.trim();
-  var pin  =document.getElementById('pinInput').value.trim();
-  var errEl=document.getElementById('errMsg');
-  if(phone.length<8){errEl.textContent='Enter a valid phone number';errEl.style.display='block';document.getElementById('phoneInput').focus();return;}
-  if(pin.length<4){errEl.textContent='Enter your 4-digit PIN';errEl.style.display='block';document.getElementById('pinInput').focus();return;}
-  try{
-    var staffList=JSON.parse(localStorage.getItem('bb_staff'))||[];
-    var sm=staffList.find(function(u){return u.phone===phone&&u.role==='barber';});
-    if(!sm){errEl.textContent='Phone not registered as a Barber. Contact your manager.';errEl.style.display='block';return;}
-    if(!sm.loginPin||sm.loginPin!==pin){errEl.textContent='Wrong PIN. Try again.';errEl.style.display='block';document.getElementById('pinInput').value='';document.getElementById('pinInput').focus();return;}
-    errEl.style.display='none';
-    sessionStorage.setItem('bb_role','barber');
-    sessionStorage.setItem('bb_phone',phone);
-    sessionStorage.setItem('bb_name',sm.name||'Barber');
-    window.location.href='app-barber.html';
-  }catch(e){errEl.textContent='Login error. Please try again.';errEl.style.display='block';}
+// Auto-redirect if already logged in
+if(sessionStorage.getItem('bb_role') === 'barber'){
+    window.location.href = 'app-barber.html';
 }
-document.addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 
+// Fetch latest staff from Google Sheet and then attempt login
+function fetchLatestAndLogin(){
+  const errEl = document.getElementById('errMsg');
+  errEl.style.display = 'none';
+  fetch(SHEET_URL)
+    .then(res => res.json())
+    .then(data => {
+        if(!Array.isArray(data)){
+          throw new Error('Invalid data format from sheet');
+        }
+        localStorage.setItem('bb_staff', JSON.stringify(data));
+        doLogin(); // proceed to login after fetching
+    })
+    .catch(err => {
+        console.error(err);
+        errEl.textContent = 'Unable to fetch staff data. Try again later.';
+        errEl.style.display = 'block';
+    });
+}
+
+// Login function
+function doLogin(){
+  const phoneEl = document.getElementById('phoneInput');
+  const pinEl = document.getElementById('pinInput');
+  const errEl = document.getElementById('errMsg');
+
+  const phone = phoneEl.value.trim();
+  const pin = pinEl.value.trim();
+
+  // Validate inputs
+  if(!/^\d{10}$/.test(phone)){
+    errEl.textContent = 'Enter a valid 10-digit phone number';
+    errEl.style.display = 'block';
+    phoneEl.focus();
+    return;
+  }
+  if(!/^\d{4}$/.test(pin)){
+    errEl.textContent = 'Enter a 4-digit PIN';
+    errEl.style.display = 'block';
+    pinEl.focus();
+    return;
+  }
+
+  try {
+    const staffList = JSON.parse(localStorage.getItem('bb_staff')) || [];
+    const user = staffList.find(u => u.phone === phone && u.role === 'barber');
+
+    if(!user){
+      errEl.textContent = 'Phone not registered as a Barber. Contact your manager.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if(user.loginPin !== pin){
+      errEl.textContent = 'Wrong PIN. Try again.';
+      errEl.style.display = 'block';
+      pinEl.value = '';
+      pinEl.focus();
+      return;
+    }
+
+    // Successful login
+    sessionStorage.setItem('bb_role','barber');
+    sessionStorage.setItem('bb_phone', phone);
+    sessionStorage.setItem('bb_name', user.name || 'Barber');
+
+    window.location.href = 'app-barber.html';
+  } catch(e){
+    console.error(e);
+    errEl.textContent = 'Login error. Please try again.';
+    errEl.style.display = 'block';
+  }
+}
+
+// Enter key support
+document.addEventListener('keydown', e => { if(e.key === 'Enter') fetchLatestAndLogin(); });
 </script>
 </body>
 </html>
