@@ -784,7 +784,7 @@ function fetchSheetRows(sheetName, filters, onDone){
 // ── AUTH ──
 var SESSION_PHONE = sessionStorage.getItem('bb_phone');
 var SESSION_ROLE  = sessionStorage.getItem('bb_role');
-if (!SESSION_PHONE || SESSION_ROLE !== 'barber') { window.location.href = 'login-barber.html'; }
+if (!SESSION_PHONE || SESSION_ROLE !== 'barber') { window.location.href = '/BB/login-barber.html'; }
 
 // ── STORAGE ──
 var LS = {
