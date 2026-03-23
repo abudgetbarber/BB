@@ -65,6 +65,17 @@ if(localStorage.getItem('bb_role') === 'barber'){
   window.location.href = 'app-barber.html';
 }
 
+  const role = localStorage.getItem('bb_role');
+if(role !== 'barber'){
+    // Not logged in as barber, redirect to login
+    window.location.href = 'login.html';
+}
+
+// Optional: display logged-in barber name
+const name = localStorage.getItem('bb_name');
+if(name){
+    document.getElementById('barberName')?.textContent = name;
+  
 function cleanPhone(p){
   return String(p||'').replace(/\D/g,'').slice(-10);
 }
