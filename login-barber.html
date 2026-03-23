@@ -43,7 +43,7 @@ input::placeholder{color:#AAAAAA}
   </div>
   <h2>Barber Portal</h2>
   <p class="sub">Enter your phone number and 4-digit PIN</p>
-  <div id="errMsg" class="err"></div>
+  <div id="errMsg" class="err">Wrong phone or PIN. Please try again.</div>
   <div class="fg">
     <label for="phoneInput">Mobile Number</label>
     <input type="tel" id="phoneInput" placeholder="Your 10-digit mobile number" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
@@ -58,13 +58,64 @@ input::placeholder{color:#AAAAAA}
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ✅ Normalize phone (last 10 digits only)
+// Normalize phone (last 10 digits only)
 function cleanPhone(p){
   const digits = String(p || '').replace(/\D/g, '');
   return digits.slice(-10);
 }
 
-// ✅ Show error
+async function doLogin() {
+  const phone = document.getElementById('phoneInput')?.value.trim();
+  const pin   = document.getElementById('pinInput')?.value.trim();
+
+  if (!phone || cleanPhone(phone).length < 10) {
+    return showError('Enter valid phone');
+  }
+  if (!pin || pin.length < 4) {
+    return showError('Enter 4-digit PIN');
+  }
+
+  showError('Checking...', true);
+
+  try {
+    const res = await fetch(SHEET_URL + '?t=' + Date.now());
+    const text = await res.text();
+
+    console.log("RAW RESPONSE:", text);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch(e) {
+      console.error("NOT JSON:", text);
+      return showError('Server not returning JSON');
+    }
+
+    // ✅ Extract staff array safely
+    const staffList = Array.isArray(parsed?.data?.staff) ? parsed.data.staff : [];
+    if (!staffList.length) return showError('No staff data found');
+
+    const user = staffList.find(u => cleanPhone(u.phone) === cleanPhone(phone));
+    if (!user) return showError('Staff not registered');
+    if (!user.loginPin) return showError('PIN not set');
+    if (String(pin).trim() !== String(user.loginPin).trim()) return showError('Wrong PIN');
+
+    // ✅ Save session
+    localStorage.setItem('bb_role', 'barber'); // keep role as barber
+    localStorage.setItem('bb_phone', cleanPhone(phone));
+    localStorage.setItem('bb_name', user.name || 'Barber');
+
+    showError('', false);
+
+    // ✅ Redirect to app page
+    window.location.href = 'app-barber.html';
+
+  } catch (err) {
+    console.error(err);
+    showError('Network error');
+  }
+}
+
 function showError(msg, show = true){
   const el = document.getElementById('errMsg');
   if (!el) return;
@@ -72,64 +123,7 @@ function showError(msg, show = true){
   el.textContent = msg;
 }
 
-// ✅ Login function
-async function doLogin() {
-  const phone = document.getElementById('phoneInput')?.value.trim();
-  const pin   = document.getElementById('pinInput')?.value.trim();
-
-  if (!phone || cleanPhone(phone).length < 10) return showError('Enter valid phone');
-  if (!pin || pin.length < 4) return showError('Enter 4-digit PIN');
-
-  showError('Checking...', true);
-
-  try {
-    const res = await fetch(SHEET_URL + '?t=' + Date.now());
-    const text = await res.text();
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch(e) {
-      console.error("NOT JSON:", text);
-      return showError('Server not returning JSON');
-    }
-
-    // ✅ Extract staff array
-    const staffList = Array.isArray(data.staff) ? data.staff : [];
-    const user = staffList.find(u =>
-      cleanPhone(u.phone) === cleanPhone(phone)
-    );
-
-    if (!user) return showError('Staff not registered');
-    if (!user.loginPin) return showError('PIN not set');
-    if (String(pin).trim() !== String(user.loginPin).trim()) return showError('Wrong PIN');
-
-    // ✅ Save session
-    localStorage.setItem('bb_role', user.role || 'staff');
-    localStorage.setItem('bb_phone', cleanPhone(phone));
-    localStorage.setItem('bb_name', user.name || 'Staff');
-
-    showError('', false);
-
-    // ✅ Redirect based on role
-    const role = (user.role || '').toLowerCase().trim();
-    let redirectPage = 'app-staff.html'; // fallback
-    if (role === 'barber') redirectPage = 'app-barber.html';
-    else if (role === 'manager') redirectPage = 'app-manager.html';
-    window.location.href = redirectPage;
-
-  } catch(err) {
-    console.error(err);
-    showError('Network error');
-  }
-}
-
-// ✅ Auto redirect if already logged in
 document.addEventListener("DOMContentLoaded", function () {
-  const role = (localStorage.getItem('bb_role') || '').toLowerCase();
-  if (role === 'barber') window.location.href = 'app-barber.html';
-  else if (role === 'manager') window.location.href = 'app-manager.html';
-
   document.getElementById("loginBtn")?.addEventListener("click", doLogin);
 });
 
