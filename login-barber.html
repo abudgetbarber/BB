@@ -66,153 +66,99 @@ input::placeholder{color:#AAAAAA}
 <script>
 var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-var _staffLoaded = false;
-var _staffList = [];
-var default_pin = '0000';
-
-var db;
-
-// ✅ INIT INDEXED DB
-function initDB() {
-  return new Promise((resolve, reject) => {
-    let request = indexedDB.open('BB_DB', 1);
-
-    request.onupgradeneeded = function(e) {
-      db = e.target.result;
-      if (!db.objectStoreNames.contains('staff')) {
-        db.createObjectStore('staff', { keyPath: 'phone' });
-      }
-    };
-
-    request.onsuccess = function(e) {
-      db = e.target.result;
-      resolve();
-    };
-
-    request.onerror = function() {
-      reject();
-    };
-  });
+// ✅ CLEAN PHONE FUNCTION
+function cleanPhone(p){
+  return String(p).replace(/\D/g, '');
 }
 
-// ✅ SAVE TO DB
-function saveStaffToDB(data) {
-  let tx = db.transaction('staff', 'readwrite');
-  let store = tx.objectStore('staff');
-  store.clear();
-  data.forEach(item => store.put(item));
-}
+// ✅ LOGIN FUNCTION (DIRECT GOOGLE SHEET)
+async function doLogin() {
 
-// ✅ LOAD FROM DB (OFFLINE)
-function loadStaffFromDB() {
-  return new Promise((resolve) => {
-    let tx = db.transaction('staff', 'readonly');
-    let store = tx.objectStore('staff');
-    let request = store.getAll();
-
-    request.onsuccess = function() {
-      resolve(request.result || []);
-    };
-
-    request.onerror = function() {
-      resolve([]);
-    };
-  });
-}
-
-// ✅ FETCH FROM GOOGLE SHEET + SYNC
-async function syncStaff() {
-  try {
-    let res = await fetch(SHEET_URL + '?t=' + Date.now());
-    let text = await res.text();
-    let data = JSON.parse(text);
-
-    if (Array.isArray(data) && data.length) {
-      _staffList = data;
-      _staffLoaded = true;
-
-      saveStaffToDB(data); // save offline
-      console.log('✅ Synced from sheet');
-    }
-
-  } catch (e) {
-    console.warn('⚠️ Sync failed, using offline data');
-  }
-}
-
-// ✅ INITIAL LOAD (OFFLINE FIRST)
-async function initApp() {
-  await initDB();
-
-  // 1. Load offline first
-  let offlineData = await loadStaffFromDB();
-  if (offlineData.length) {
-    _staffList = offlineData;
-    _staffLoaded = true;
-    console.log('⚡ Loaded from offline DB');
-  }
-
-  // 2. Then sync online (background)
-  syncStaff();
-}
-
-// ✅ LOGIN
-function doLogin() {
-  var phone = document.getElementById('phoneInput').value.trim();
-  var pin   = document.getElementById('pinInput').value.trim();
+  var phone = document.getElementById('phoneInput')?.value.trim();
+  var pin   = document.getElementById('pinInput')?.value.trim();
   var errEl = document.getElementById('errMsg');
 
-  if (phone.length < 10) {
+  if (!phone || cleanPhone(phone).length < 10) {
     errEl.textContent = 'Enter valid phone';
     errEl.style.display = 'block';
     return;
   }
 
-  if (pin.length < 4) {
+  if (!pin || pin.length < 4) {
     errEl.textContent = 'Enter 4-digit PIN';
     errEl.style.display = 'block';
     return;
   }
 
-  if (!_staffLoaded) {
-    errEl.textContent = 'Loading data...';
-    errEl.style.display = 'block';
-    return;
+  errEl.textContent = 'Checking...';
+  errEl.style.display = 'block';
+
+  try {
+    // ✅ FETCH FROM GOOGLE SHEET
+    let res = await fetch(SHEET_URL + '?t=' + Date.now());
+    let text = await res.text();
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(e) {
+      errEl.textContent = 'Server error. Try again.';
+      return;
+    }
+
+    if (!Array.isArray(data)) {
+      errEl.textContent = 'Invalid data format';
+      return;
+    }
+
+    // ✅ FIND BARBER
+    var sm = data.find(u =>
+      cleanPhone(u.phone) === cleanPhone(phone) &&
+      String(u.role).toLowerCase().trim() === 'barber'
+    );
+
+    if (!sm) {
+      errEl.textContent = 'Not registered';
+      return;
+    }
+
+    // ❌ NO DEFAULT PIN — MUST EXIST
+    if (!sm.loginPin) {
+      errEl.textContent = 'PIN not set. Contact admin.';
+      return;
+    }
+
+    var storedPin = String(sm.loginPin).trim();
+
+    if (String(pin) !== storedPin) {
+      errEl.textContent = 'Wrong PIN';
+      return;
+    }
+
+    // ✅ SUCCESS LOGIN
+    localStorage.setItem('bb_role', 'barber');
+    localStorage.setItem('bb_phone', cleanPhone(phone));
+    localStorage.setItem('bb_name', sm.name || 'Barber');
+
+    errEl.style.display = 'none';
+
+    window.location.href = 'app-barber.html';
+
+  } catch (e) {
+    console.error(e);
+    errEl.textContent = 'Network error. Check internet.';
   }
-
-  var sm = _staffList.find(u =>
-    String(u.phone) === String(phone) &&
-    String(u.role).toLowerCase() === 'barber'
-  );
-
-  if (!sm) {
-    errEl.textContent = 'Not registered';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  var storedPin = sm.loginPin ? String(sm.loginPin) : default_pin;
-
-  if (String(pin) !== storedPin) {
-    errEl.textContent = 'Wrong PIN';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  // ✅ SUCCESS
-  sessionStorage.setItem('bb_role', 'barber');
-  sessionStorage.setItem('bb_phone', phone);
-  sessionStorage.setItem('bb_name', sm.name || 'Barber');
-
-  window.location.href = 'app-barber.html';
 }
 
-// ✅ START APP
-window.addEventListener('load', function() {
-  initApp();
+// ✅ BUTTON CLICK (MOBILE SAFE)
+document.addEventListener("DOMContentLoaded", function () {
+  const btn = document.getElementById("loginBtn");
+  if (btn) {
+    btn.addEventListener("click", doLogin);
+  }
 });
 
-// ✅ ENTER KEY
+// ✅ ENTER KEY SUPPORT
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') doLogin();
 });
