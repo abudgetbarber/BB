@@ -56,93 +56,108 @@ input::placeholder{color:#AAAAAA}
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-const DEBUG = true;
+// Temporary in-memory "local file"
+let STAFF_CACHE = null;
 
-// Prevent double load
-if(window.__bb_loaded){
-  console.warn("Already loaded");
-} else {
-  window.__bb_loaded = true;
-}
-
-// Debug logger
-function logDebug(...args){
-    if(!DEBUG) return;
-
-    console.log(...args);
-
-    let dbg = document.getElementById('debugBox');
-
-    if(!dbg){
-        dbg = document.createElement('div');
-        dbg.id = 'debugBox';
-        dbg.style = "margin-top:20px;font-size:11px;background:#111;color:#0f0;padding:10px;border-radius:8px;max-height:200px;overflow:auto;";
-        document.body.appendChild(dbg); // ✅ FIXED (no duplication)
-    }
-
-    dbg.innerHTML += args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + "<br>";
-}
-
-// Auto redirect
+// Auto redirect if already logged in
 if(sessionStorage.getItem('bb_role') === 'barber'){
     window.location.href = 'app-barber.html';
 }
 
-function loginBarber(){
+// Load staff data once
+async function loadStaff(){
+    if(STAFF_CACHE) return STAFF_CACHE; // already loaded
+
+    const res = await fetch(SHEET_URL);
+    const data = await res.json();
+
+    let staff = [];
+
+    // Case 1: already array of objects
+    if(Array.isArray(data)){
+        staff = data;
+    }
+    // Case 2: Google sheet format (values)
+    else if(Array.isArray(data.values)){
+        const rows = data.values;
+        const headers = rows[0].map(h => h.trim());
+
+        for(let i=1; i<rows.length; i++){
+            let obj = {};
+            headers.forEach((key, index) => obj[key] = rows[i][index]);
+            staff.push(obj);
+        }
+    }
+
+    // Filter only barbers
+    STAFF_CACHE = staff.filter(u => 
+        (u.role || '').toLowerCase() === 'barber'
+    );
+
+    return STAFF_CACHE;
+}
+
+async function loginBarber(){
+    const errEl = document.getElementById('errMsg');
+    errEl.style.display = 'none';
 
     const phone = document.getElementById('phoneInput').value.trim();
-    const pin   = document.getElementById('pinInput').value.trim();
+    const pin = document.getElementById('pinInput').value.trim();
 
-    if(!/^\d{10}$/.test(phone)) return showError("Invalid phone");
-    if(!/^\d{4}$/.test(pin)) return showError("Invalid PIN");
+    if(!/^\d{10}$/.test(phone)){
+        return showError('Enter valid 10-digit phone');
+    }
+    if(!/^\d{4}$/.test(pin)){
+        return showError('Enter 4-digit PIN');
+    }
 
-    const url = SHEET_URL + "?action=loginBarber&phone=" + phone;
+    try{
+        errEl.textContent = 'Checking...';
+        errEl.style.display = 'block';
 
-    logDebug("Calling:", url);
+        const staff = await loadStaff();
 
-    fetch(url)
-    .then(res => res.json())
-    .then(data => {
-
-        logDebug("Response:", JSON.stringify(data));
-
-        if(!data.ok){
-            return showError(data.message || "Login failed");
+        if(!staff.length){
+            throw new Error('No barber data found');
         }
 
-        const user = data.user;
+        const user = staff.find(u => u.phone === phone);
 
-        // ✅ CORRECT FIELD
-        if(String(user.loginPin).trim() !== pin){
-            return showError("Wrong PIN");
+        if(!user){
+            return showError('Barber not found');
         }
 
-        // ✅ SUCCESS
-        sessionStorage.clear();
+        if(String(user.loginPin) !== String(pin)){
+            return showError('Wrong PIN');
+        }
+
+        // Success
         sessionStorage.setItem('bb_role','barber');
-        sessionStorage.setItem('bb_name', user.name);
-        sessionStorage.setItem('bb_id', user.id);
+        sessionStorage.setItem('bb_phone', phone);
+        sessionStorage.setItem('bb_name', user.name || 'Barber');
 
         window.location.href = 'app-barber.html';
-    })
-    .catch(err => {
-        logDebug("ERROR:", err.message);
-        showError("Connection error");
-    });
+
+    }catch(err){
+        console.error(err);
+        showError('Error: ' + err.message);
+    }
 }
 
 function showError(msg){
     const errEl = document.getElementById('errMsg');
     errEl.textContent = msg;
     errEl.style.display = 'block';
-    logDebug("Error:", msg);
 }
 
-// Enter key
-document.addEventListener('keydown', e=>{
+// Preload staff in background (like loading local file)
+loadStaff();
+
+// Enter key support
+document.addEventListener('keydown', e => {
     if(e.key === 'Enter') loginBarber();
 });
 </script>
-
+  
 </body>
 </html>
