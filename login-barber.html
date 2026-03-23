@@ -9,25 +9,19 @@
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Barlow',sans-serif;background:#F0F0EA;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px}
-.card{background:white;border-radius:16px;padding:32px 24px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.10);border:1px solid #E0E0D8}
-.logo-wrap{text-align:center;margin-bottom:24px}
-.logo-box{display:inline-block;background:#F5E030;border-radius:10px;padding:10px 24px}
-.logo-text{font-family:'Bebas Neue',sans-serif;font-size:32px;color:#003D2B;letter-spacing:2px}
-.role-banner{background:#004F38;color:#F5E030;border-radius:10px;padding:14px 16px;display:flex;gap:12px;margin-bottom:24px}
-.role-icon{font-size:26px}
-.role-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase}
-.role-sub{font-size:11px;color:rgba(245,224,48,.6)}
-h2{font-size:22px;font-weight:800;color:#1A1A14}
-.sub{font-size:13px;color:#767668;margin-bottom:22px}
-label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#767668;margin-bottom:8px}
-input{width:100%;background:#F8F8F4;border:2px solid #E0E0D8;border-radius:8px;padding:14px;font-size:16px}
-input:focus{border-color:#004F38}
-.fg{margin-bottom:18px}
-.btn{width:100%;padding:15px;border-radius:8px;border:none;font-size:15px;font-weight:800;text-transform:uppercase;cursor:pointer}
+body{font-family:'Barlow',sans-serif;background:#F0F0EA;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:16px;padding:30px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.1)}
+.logo-box{background:#F5E030;padding:10px 20px;border-radius:8px;text-align:center;margin-bottom:20px}
+.logo-text{font-family:'Bebas Neue';font-size:30px;color:#003D2B}
+.role-banner{background:#004F38;color:#F5E030;padding:12px;border-radius:8px;margin-bottom:20px}
+h2{margin-bottom:5px}
+.sub{font-size:13px;color:#666;margin-bottom:20px}
+label{font-size:12px;font-weight:700;margin-bottom:5px;display:block}
+input{width:100%;padding:12px;border:2px solid #ddd;border-radius:8px;margin-bottom:15px}
+.btn{width:100%;padding:14px;border:none;border-radius:8px;font-weight:800;cursor:pointer}
 .btn-primary{background:#004F38;color:#F5E030}
-.btn-secondary{background:transparent;border:2px solid #E0E0D8;color:#767668;margin-top:10px;text-align:center;display:block;text-decoration:none;padding:14px}
-.err{color:#DC2626;font-size:13px;text-align:center;margin-bottom:12px;display:none}
+.btn-secondary{margin-top:10px;border:2px solid #ddd;text-align:center;display:block;padding:12px;text-decoration:none;color:#666}
+.err{color:red;text-align:center;margin-bottom:10px;display:none}
 </style>
 </head>
 
@@ -35,152 +29,70 @@ input:focus{border-color:#004F38}
 
 <div class="card">
 
-  <div class="logo-wrap">
-    <div class="logo-box">
-      <span class="logo-text">BB</span>
-    </div>
-  </div>
+<div class="logo-box"><span class="logo-text">BB</span></div>
 
-  <div class="role-banner">
-    <span class="role-icon">✂️</span>
-    <div>
-      <span class="role-title">Barber Login</span><br>
-      <span class="role-sub">Log your sales & style cards</span>
-    </div>
-  </div>
+<div class="role-banner">✂️ Barber Login</div>
 
-  <h2>Barber Portal</h2>
-  <p class="sub">Enter your phone number and 4-digit PIN</p>
+<h2>Barber Portal</h2>
+<p class="sub">Enter phone & PIN</p>
 
-  <div id="errMsg" class="err"></div>
+<div id="errMsg" class="err"></div>
 
-  <div class="fg">
-    <label>Mobile Number</label>
-    <input type="tel" id="phoneInput" maxlength="10"
-      placeholder="10-digit number"
-      oninput="this.value=this.value.replace(/\D/g,'')">
-  </div>
+<label>Mobile</label>
+<input type="tel" id="phoneInput" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
 
-  <div class="fg">
-    <label>PIN</label>
-    <input type="password" id="pinInput" maxlength="4"
-      placeholder="4-digit PIN"
-      oninput="this.value=this.value.replace(/\D/g,'')">
-  </div>
+<label>PIN</label>
+<input type="password" id="pinInput" maxlength="4" oninput="this.value=this.value.replace(/\D/g,'')">
 
-  <button class="btn btn-primary" onclick="loginBarber()">Login →</button>
-  <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
+<button class="btn btn-primary" onclick="loginBarber()">Login →</button>
+<a href="index.html" class="btn btn-secondary">← Back</a>
 
 </div>
 
 <script>
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
+const SHEET_URL = 'PASTE_YOUR_NEW_WEB_APP_URL_HERE';
 const DEBUG = true;
 
-// Prevent duplicate script execution
-if(window.__bb_loaded){
-  console.warn("Already loaded");
-} else {
-  window.__bb_loaded = true;
-}
-
-// Debug logger
 function logDebug(...args){
     if(!DEBUG) return;
-
     console.log(...args);
 
     let dbg = document.getElementById('debugBox');
-
     if(!dbg){
         dbg = document.createElement('div');
-        dbg.id = 'debugBox';
-        dbg.style = "margin-top:20px;font-size:11px;background:#111;color:#0f0;padding:10px;border-radius:8px;max-height:200px;overflow:auto;";
+        dbg.style="margin-top:20px;background:#111;color:#0f0;padding:10px;font-size:11px;max-height:200px;overflow:auto";
         document.body.appendChild(dbg);
     }
-
-    dbg.innerHTML += args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + "<br>";
-}
-
-// Auto redirect
-if(sessionStorage.getItem('bb_role') === 'barber'){
-    window.location.href = 'app-barber.html';
+    dbg.innerHTML += args.join(' ') + "<br>";
 }
 
 function loginBarber(){
 
-    const errEl = document.getElementById('errMsg');
-    errEl.style.display = 'none';
-
     const phone = document.getElementById('phoneInput').value.trim();
     const pin = document.getElementById('pinInput').value.trim();
 
-    logDebug("Phone:", phone);
-    logDebug("PIN:", pin);
+    if(!/^\d{10}$/.test(phone)) return showError("Invalid phone");
+    if(!/^\d{4}$/.test(pin)) return showError("Invalid PIN");
 
-    if(!/^\d{10}$/.test(phone)){
-        return showError("Invalid phone");
-    }
+    const url = SHEET_URL + "?phone=" + phone;
 
-    if(!/^\d{4}$/.test(pin)){
-        return showError("Invalid PIN");
-    }
+    logDebug("Calling:", url);
 
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 8000);
+    fetch(url)
+    .then(res => res.json())
+    .then(data => {
 
-    fetch(SHEET_URL, { signal: controller.signal })
-    .then(res => {
-        logDebug("Status:", res.status);
-        return res.text();
-    })
-    .then(text => {
-
-        logDebug("Raw Text:", text);
-
-        let data;
-        try{
-            data = JSON.parse(text);
-        }catch(e){
-            throw new Error("Invalid JSON response");
-        }
+        logDebug("Response:", JSON.stringify(data));
 
         if(data.error){
-            throw new Error(data.message || "Backend error");
+            throw new Error(data.message);
         }
 
-        let staff = [];
-
-        if(Array.isArray(data)){
-            staff = data;
-        }
-        else if(Array.isArray(data.values)){
-            const headers = data.values[0];
-
-            for(let i=1;i<data.values.length;i++){
-                let obj = {};
-                headers.forEach((h,idx)=>{
-                    obj[h.trim()] = String(data.values[i][idx]).trim();
-                });
-                staff.push(obj);
-            }
-        }
-        else{
-            throw new Error("Unknown data format");
-        }
-
-        logDebug("Staff:", staff);
-
-        const user = staff.find(u =>
-            String(u.phone).trim() === phone &&
-            String(u.role).toLowerCase().trim() === 'barber'
-        );
-
-        logDebug("User:", user);
-
-        if(!user){
+        if(!data.success){
             return showError("Barber not found");
         }
+
+        const user = data.user;
 
         if(String(user.loginPin).trim() !== pin){
             return showError("Wrong PIN");
@@ -190,33 +102,21 @@ function loginBarber(){
 
         sessionStorage.clear();
         sessionStorage.setItem('bb_role','barber');
-        sessionStorage.setItem('bb_phone', phone);
-        sessionStorage.setItem('bb_name', user.name || 'Barber');
+        sessionStorage.setItem('bb_name', user.name);
 
         window.location.href = 'app-barber.html';
     })
     .catch(err => {
         logDebug("ERROR:", err.message);
-
-        if(err.name === 'AbortError'){
-            showError("Request timeout. Try again.");
-        } else {
-            showError("Connection error");
-        }
+        showError("Connection error");
     });
 }
 
 function showError(msg){
-    const errEl = document.getElementById('errMsg');
-    errEl.textContent = msg;
-    errEl.style.display = 'block';
-    logDebug("Error shown:", msg);
+    const el = document.getElementById('errMsg');
+    el.innerText = msg;
+    el.style.display = 'block';
 }
-
-// Enter key support
-document.addEventListener('keydown', e=>{
-    if(e.key === 'Enter') loginBarber();
-});
 </script>
 
 </body>
