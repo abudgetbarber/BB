@@ -66,10 +66,29 @@ input::placeholder{color:#AAAAAA}
   <button class="btn btn-primary" id="loginBtn" onclick="fetchLatestAndLogin(doLogin)">Login →</button>
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
-  
-<script>
+
+  <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
+// Toggle debug ON/OFF
+const DEBUG = true;
+
+// Debug logger
+function logDebug(...args){
+    if(!DEBUG) return;
+    console.log(...args);
+
+    let dbg = document.getElementById('debugBox');
+    if(!dbg){
+        dbg = document.createElement('div');
+        dbg.id = 'debugBox';
+        dbg.style = "margin-top:15px;font-size:11px;background:#111;color:#0f0;padding:10px;border-radius:8px;max-height:200px;overflow:auto;";
+        document.querySelector('.card').appendChild(dbg);
+    }
+    dbg.innerHTML += args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + "<br>";
+}
+
+// Auto redirect
 if(sessionStorage.getItem('bb_role') === 'barber'){
     window.location.href = 'app-barber.html';
 }
@@ -81,38 +100,78 @@ function loginBarber(){
     const phone = document.getElementById('phoneInput').value.trim();
     const pin = document.getElementById('pinInput').value.trim();
 
+    logDebug("Entered Phone:", phone);
+    logDebug("Entered PIN:", pin);
+
     if(!/^\d{10}$/.test(phone)){
-        return showError('Enter valid 10-digit phone');
+        return showError('Invalid phone');
     }
     if(!/^\d{4}$/.test(pin)){
-        return showError('Enter 4-digit PIN');
+        return showError('Invalid PIN');
     }
 
-    fetch(SHEET_URL)
-    .then(res => res.json())
-    .then(staff => {
+    logDebug("Fetching from:", SHEET_URL);
 
-        if(!Array.isArray(staff) || staff.length === 0){
-            throw new Error('Staff sheet empty or not loading');
+    fetch(SHEET_URL)
+    .then(res => {
+        logDebug("Response status:", res.status);
+        return res.json();
+    })
+    .then(data => {
+        logDebug("Raw Response:", data);
+
+        let staff = [];
+
+        // Case 1: Already array
+        if(Array.isArray(data)){
+            logDebug("Data is ARRAY");
+            staff = data;
+        }
+        // Case 2: values format
+        else if(Array.isArray(data.values)){
+            logDebug("Data is VALUES format");
+
+            const rows = data.values;
+            const headers = rows[0].map(h => h.trim());
+
+            logDebug("Headers:", headers);
+
+            for(let i = 1; i < rows.length; i++){
+                let obj = {};
+                headers.forEach((h, idx) => obj[h] = String(rows[i][idx]).trim());
+                staff.push(obj);
+            }
+        }
+        else{
+            logDebug("UNKNOWN FORMAT ❌");
+            throw new Error("Invalid data format from sheet");
         }
 
-        // DEBUG (you can remove later)
-        console.log("Staff Data:", staff);
+        logDebug("Processed Staff:", staff);
 
-        const user = staff.find(u =>
-            String(u.phone).trim() === phone &&
-            String(u.role).toLowerCase().trim() === 'barber'
-        );
+        if(staff.length === 0){
+            throw new Error("Staff sheet empty");
+        }
+
+        // Find barber
+        const user = staff.find(u => {
+            return String(u.phone).trim() === phone &&
+                   String(u.role).toLowerCase().trim() === 'barber';
+        });
+
+        logDebug("Matched User:", user);
 
         if(!user){
-            return showError('Barber not found. Check phone.');
+            return showError('Barber not found');
         }
 
         if(String(user.loginPin).trim() !== pin){
             return showError('Wrong PIN');
         }
 
-        sessionStorage.clear(); // clean session
+        logDebug("LOGIN SUCCESS ✅");
+
+        sessionStorage.clear();
         sessionStorage.setItem('bb_role','barber');
         sessionStorage.setItem('bb_phone', phone);
         sessionStorage.setItem('bb_name', user.name || 'Barber');
@@ -121,7 +180,8 @@ function loginBarber(){
     })
     .catch(err => {
         console.error(err);
-        showError('Connection failed. Check sheet/web app.');
+        logDebug("ERROR:", err.message);
+        showError('Fetch failed: ' + err.message);
     });
 }
 
@@ -129,8 +189,10 @@ function showError(msg){
     const errEl = document.getElementById('errMsg');
     errEl.textContent = msg;
     errEl.style.display = 'block';
+    logDebug("ERROR SHOWN:", msg);
 }
 
+// Enter key
 document.addEventListener('keydown', e => {
     if(e.key === 'Enter') loginBarber();
 });
