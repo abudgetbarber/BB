@@ -62,32 +62,37 @@ input::placeholder{color:#AAAAAA}
   <button class="btn btn-primary" id="loginBtn" onclick="fetchLatestAndLogin(doLogin)">Login →</button>
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
+
 <script>
 var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
 var _staffLoaded = false;
 var default_pin = '0000';
 
-// ✅ LOAD STAFF FROM GOOGLE SHEET
+// ✅ LOAD STAFF (MOBILE SAFE + NO CACHE)
 async function loadStaffFromSheet() {
   try {
-    let res = await fetch(SHEET_URL);
-    let data = await res.json();
+    let res = await fetch(SHEET_URL + '?t=' + Date.now(), {
+      method: 'GET'
+    });
 
-    if (data && data.length) {
+    let text = await res.text();
+    let data = JSON.parse(text);
+
+    if (Array.isArray(data) && data.length > 0) {
       localStorage.setItem('bb_staff', JSON.stringify(data));
       _staffLoaded = true;
-      console.log('✅ Staff loaded:', data.length);
+      console.log('✅ Staff loaded:', data);
     } else {
-      console.warn('⚠️ Empty sheet data');
+      throw new Error('Empty data from sheet');
     }
 
   } catch (e) {
-    console.error('❌ Failed to load staff:', e);
+    console.error('❌ Load failed:', e);
 
-    // ✅ fallback if already exists
+    // ✅ OFFLINE FALLBACK
     let cached = JSON.parse(localStorage.getItem('bb_staff') || '[]');
-    if (cached.length) {
+    if (cached.length > 0) {
       _staffLoaded = true;
       console.log('⚠️ Using cached staff data');
     }
@@ -100,19 +105,19 @@ function doLogin() {
   var pin   = document.getElementById('pinInput').value.trim();
   var errEl = document.getElementById('errMsg');
 
-  if(phone.length < 10){
-    errEl.textContent='Enter a valid phone number';
-    errEl.style.display='block';
+  if (phone.length < 10) {
+    errEl.textContent = 'Enter a valid phone number';
+    errEl.style.display = 'block';
     return;
   }
 
-  if(pin.length < 4){
-    errEl.textContent='Enter your 4-digit PIN';
-    errEl.style.display='block';
+  if (pin.length < 4) {
+    errEl.textContent = 'Enter your 4-digit PIN';
+    errEl.style.display = 'block';
     return;
   }
 
-  // 🚨 BLOCK LOGIN IF DATA NOT LOADED
+  // 🚨 WAIT UNTIL DATA LOADS
   if (!_staffLoaded) {
     errEl.textContent = 'Loading staff data, please wait...';
     errEl.style.display = 'block';
@@ -125,33 +130,36 @@ function doLogin() {
 
   if (!staffList.length) {
     errEl.textContent = 'No staff data available. Check internet.';
-    errEl.style.display='block';
+    errEl.style.display = 'block';
     return;
   }
 
-  // ✅ SAFE PHONE MATCH (STRING)
-  var sm = staffList.find(function(u){
-    return String(u.phone) === String(phone) && u.role === 'barber';
+  // ✅ SAFE MATCH (PHONE + ROLE)
+  var sm = staffList.find(function(u) {
+    return String(u.phone) === String(phone) &&
+           String(u.role).toLowerCase() === 'barber';
   });
 
-  if(!sm){
-    errEl.textContent='Phone not registered as Barber — contact admin';
-    errEl.style.display='block';
+  if (!sm) {
+    errEl.textContent = 'Phone not registered as Barber — contact admin';
+    errEl.style.display = 'block';
     return;
   }
 
-  // ✅ SAFE PIN LOGIC WITH DEFAULT PIN
+  // ✅ SAFE PIN (WITH DEFAULT)
   var storedPin = sm.loginPin ? String(sm.loginPin) : default_pin;
 
   if (String(pin) !== storedPin) {
-    errEl.textContent='Wrong PIN. Try again.';
-    errEl.style.display='block';
-    document.getElementById('pinInput').value='';
+    errEl.textContent = 'Wrong PIN. Try again.';
+    errEl.style.display = 'block';
+    document.getElementById('pinInput').value = '';
     return;
   }
 
   // ✅ SUCCESS
-  sessionStorage.setItem('bb_role','barber');
+  console.log('✅ Login success:', sm);
+
+  sessionStorage.setItem('bb_role', 'barber');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', sm.name || 'Barber');
 
@@ -165,10 +173,11 @@ window.addEventListener('load', function() {
 
 // ✅ ENTER KEY SUPPORT
 document.addEventListener('keydown', function(e) {
-  if(e.key === 'Enter' && !document.getElementById('loginBtn').disabled) {
+  if (e.key === 'Enter' && !document.getElementById('loginBtn').disabled) {
     doLogin();
   }
 });
 </script>
+  
 </body>
 </html>
