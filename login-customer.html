@@ -54,17 +54,8 @@ input::placeholder{color:#AAAAAA}
     <label>PIN</label>
     <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
-  
-  <!-- Restore from Sheets (shown when no local data) -->
-  </div>
-    <div style="font-size:12px;color:#767668;margin-bottom:10px;line-height:1.5">Paste your salon's Google Sheets URL to load staff data, then log in normally.</div>
-    
-    
-    <div id="restore-status" style="font-size:11px;color:#767668;margin-top:8px;min-height:16px;text-align:center"></div>
-  </div>
 
-  <div id="debugLog" style="display:none;background:#f8f8f4;border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:12px;max-height:180px;overflow-y:auto;font-family:monospace;font-size:11px;text-align:left"></div>
-  <button class="btn btn-primary" id="loginBtn" onclick="fetchLatestAndLogin(doLogin)">Login →</button>
+  <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">Login →</button>
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
 <script>
