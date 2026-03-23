@@ -66,6 +66,7 @@ input::placeholder{color:#AAAAAA}
 
 var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 var _staffLoaded = false;
+var default_pin = '0000';
 function doLogin() {
   var phone = document.getElementById('phoneInput').value.trim();
   var pin   = document.getElementById('pinInput').value.trim();
@@ -76,7 +77,6 @@ function doLogin() {
   var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
   log('Checking against ' + staffList.length + ' staff records', '#333');
   var sm = staffList.find(function(u){ return u.phone===phone && u.role==='barber'; });
-  var default_pin = '0000';
   if(!sm){
     log('❌ No barber found with phone: ' + phone, 'red');
     log('Available phones: ' + staffList.map(function(u){return u.phone;}).join(', '), 'orange');
