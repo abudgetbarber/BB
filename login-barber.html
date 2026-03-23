@@ -66,15 +66,16 @@ input::placeholder{color:#AAAAAA}
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
+// ✅ Normalize phone (last 10 digits only)
 function cleanPhone(p){
-  return String(p || '').replace(/\D/g, '');
+  const digits = String(p || '').replace(/\D/g, '');
+  return digits.slice(-10);
 }
 
 async function doLogin() {
 
   const phone = document.getElementById('phoneInput')?.value.trim();
   const pin   = document.getElementById('pinInput')?.value.trim();
-  const errEl = document.getElementById('errMsg');
 
   if (!phone || cleanPhone(phone).length < 10) {
     return showError('Enter valid phone');
@@ -90,6 +91,8 @@ async function doLogin() {
     const res = await fetch(SHEET_URL + '?t=' + Date.now());
     const text = await res.text();
 
+    console.log("RAW RESPONSE:", text);
+
     let data;
 
     try {
@@ -99,36 +102,53 @@ async function doLogin() {
       return showError('Server not returning JSON');
     }
 
-    // ✅ HANDLE FORMAT
+    console.log("PARSED DATA:", data);
+
+    // ✅ HANDLE ANY FORMAT
     if (!Array.isArray(data)) {
-      if (data.data && Array.isArray(data.data)) {
+      if (Array.isArray(data.data)) {
         data = data.data;
+      } else if (Array.isArray(data.users)) {
+        data = data.users;
+      } else if (Array.isArray(data.result)) {
+        data = data.result;
+      } else if (typeof data.data === 'object') {
+        data = [data.data]; // single object → array
       } else {
         console.error("FORMAT ERROR:", data);
         return showError('Invalid data format');
       }
     }
 
-    const user = data.find(u =>
-      cleanPhone(u.phone) === cleanPhone(phone) &&
-      String(u.role).toLowerCase().trim() === 'barber'
+    // ✅ FILTER ONLY STAFF (change if needed)
+    const staffList = data.filter(u =>
+      String(u.role || '').toLowerCase().trim() === 'staff'
     );
 
-    if (!user) return showError('Not registered');
+    console.log("STAFF LIST:", staffList);
+
+    // ✅ FIND USER
+    const user = staffList.find(u =>
+      cleanPhone(u.phone) === cleanPhone(phone)
+    );
+
+    if (!user) return showError('Staff not registered');
 
     if (!user.loginPin) return showError('PIN not set');
 
-    if (String(pin) !== String(user.loginPin).trim()) {
+    if (String(pin).trim() !== String(user.loginPin).trim()) {
       return showError('Wrong PIN');
     }
 
-    localStorage.setItem('bb_role', 'barber');
+    // ✅ SAVE SESSION
+    localStorage.setItem('bb_role', 'staff');
     localStorage.setItem('bb_phone', cleanPhone(phone));
-    localStorage.setItem('bb_name', user.name || 'Barber');
+    localStorage.setItem('bb_name', user.name || 'Staff');
 
     showError('', false);
 
-    window.location.href = 'app-barber.html';
+    // ✅ REDIRECT
+    window.location.href = 'app-staff.html';
 
   } catch (err) {
     console.error(err);
@@ -136,6 +156,7 @@ async function doLogin() {
   }
 }
 
+// ✅ ERROR DISPLAY
 function showError(msg, show = true){
   const el = document.getElementById('errMsg');
   if (!el) return;
@@ -143,6 +164,7 @@ function showError(msg, show = true){
   el.textContent = msg;
 }
 
+// ✅ EVENTS
 document.addEventListener("DOMContentLoaded", function () {
   document.getElementById("loginBtn")?.addEventListener("click", doLogin);
 });
