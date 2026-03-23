@@ -63,10 +63,39 @@ input::placeholder{color:#AAAAAA}
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
 <script>
-
+<script>
 var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
+
 var _staffLoaded = false;
 var default_pin = '0000';
+
+// ✅ LOAD STAFF FROM GOOGLE SHEET
+async function loadStaffFromSheet() {
+  try {
+    let res = await fetch(SHEET_URL);
+    let data = await res.json();
+
+    if (data && data.length) {
+      localStorage.setItem('bb_staff', JSON.stringify(data));
+      _staffLoaded = true;
+      console.log('✅ Staff loaded:', data.length);
+    } else {
+      console.warn('⚠️ Empty sheet data');
+    }
+
+  } catch (e) {
+    console.error('❌ Failed to load staff:', e);
+
+    // ✅ fallback if already exists
+    let cached = JSON.parse(localStorage.getItem('bb_staff') || '[]');
+    if (cached.length) {
+      _staffLoaded = true;
+      console.log('⚠️ Using cached staff data');
+    }
+  }
+}
+
+// ✅ LOGIN FUNCTION
 function doLogin() {
   var phone = document.getElementById('phoneInput').value.trim();
   var pin   = document.getElementById('pinInput').value.trim();
@@ -84,44 +113,45 @@ function doLogin() {
     return;
   }
 
+  // 🚨 BLOCK LOGIN IF DATA NOT LOADED
+  if (!_staffLoaded) {
+    errEl.textContent = 'Loading staff data, please wait...';
+    errEl.style.display = 'block';
+    return;
+  }
+
   errEl.style.display = 'none';
 
-  try {
-    var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
+  var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
 
-    log('Checking against ' + staffList.length + ' staff records', '#333');
-
-    var sm = staffList.find(function(u){
-      return u.phone === phone && u.role === 'barber';
-    });
-
-    if(!sm){
-      log('❌ No barber found with phone: ' + phone, 'red');
-      errEl.textContent='Phone not registered as Barber — contact admin';
-      errEl.style.display='block';
-      return;
-    }
-
-    log('Found: ' + sm.name + ' role=' + sm.role, 'green');
-
-    // ✅ FIXED PIN CHECK
-    if (String(pin) !== String(sm.loginPin)) {
-      log('❌ PIN mismatch. Stored:' + JSON.stringify(sm.loginPin) + ' Entered:' + JSON.stringify(pin), 'red');
-      errEl.textContent='Wrong PIN. Try again.';
-      errEl.style.display='block';
-      document.getElementById('pinInput').value='';
-      return;
-    }
-
-  } catch (e) {
-    console.error(e);
-    errEl.textContent='Something went wrong';
+  if (!staffList.length) {
+    errEl.textContent = 'No staff data available. Check internet.';
     errEl.style.display='block';
     return;
   }
 
-  log('✅ Login success!', 'green');
+  // ✅ SAFE PHONE MATCH (STRING)
+  var sm = staffList.find(function(u){
+    return String(u.phone) === String(phone) && u.role === 'barber';
+  });
 
+  if(!sm){
+    errEl.textContent='Phone not registered as Barber — contact admin';
+    errEl.style.display='block';
+    return;
+  }
+
+  // ✅ SAFE PIN LOGIC WITH DEFAULT PIN
+  var storedPin = sm.loginPin ? String(sm.loginPin) : default_pin;
+
+  if (String(pin) !== storedPin) {
+    errEl.textContent='Wrong PIN. Try again.';
+    errEl.style.display='block';
+    document.getElementById('pinInput').value='';
+    return;
+  }
+
+  // ✅ SUCCESS
   sessionStorage.setItem('bb_role','barber');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', sm.name || 'Barber');
@@ -129,8 +159,16 @@ function doLogin() {
   window.location.href = 'app-barber.html';
 }
 
+// ✅ LOAD DATA ON PAGE LOAD
+window.addEventListener('load', function() {
+  loadStaffFromSheet();
+});
+
+// ✅ ENTER KEY SUPPORT
 document.addEventListener('keydown', function(e) {
-  if(e.key === 'Enter' && !document.getElementById('loginBtn').disabled) doLogin();
+  if(e.key === 'Enter' && !document.getElementById('loginBtn').disabled) {
+    doLogin();
+  }
 });
 </script>
 </body>
