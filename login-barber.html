@@ -58,63 +58,61 @@ input::placeholder{color:#AAAAAA}
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// Normalize phone (last 10 digits)
-function cleanPhone(p){
-  const digits = String(p||'').replace(/\D/g,'');
-  return digits.slice(-10);
-}
+function cleanPhone(p){ return String(p||'').replace(/\D/g,'').slice(-10); }
 
 async function doLogin() {
   const phone = document.getElementById('phoneInput')?.value.trim();
   const pin = document.getElementById('pinInput')?.value.trim();
 
-  if(!phone || cleanPhone(phone).length < 10) return showError('Enter valid phone');
-  if(!pin || pin.length < 4) return showError('Enter 4-digit PIN');
+  if(!phone || cleanPhone(phone).length<10) return showError('Enter valid phone');
+  if(!pin || pin.length<4) return showError('Enter 4-digit PIN');
 
   showError('Checking...', true);
 
   try{
-    const res = await fetch(SHEET_URL + '?t=' + Date.now());
+    const res = await fetch(SHEET_URL+'?t='+Date.now());
     const text = await res.text();
     let data;
 
-    try{ data = JSON.parse(text); } 
-    catch(e){ return showError('Server not returning JSON'); }
+    try { data = JSON.parse(text); } catch(e){ return showError('Server not returning JSON'); }
 
-    if(!Array.isArray(data)) {
-      if(Array.isArray(data.staff)) data = data.staff;
+    if(!Array.isArray(data)){
+      if(Array.isArray(data.staff)) data=data.staff;
       else return showError('Invalid data format');
     }
 
-    const user = data.find(u => String(u.role).toLowerCase() === 'barber' && cleanPhone(u.phone) === cleanPhone(phone));
+    // ✅ FIND BARBER
+    const user = data.find(u=>String(u.role).toLowerCase()==='barber' && cleanPhone(u.phone)===cleanPhone(phone));
     if(!user) return showError('Staff not registered');
     if(!user.loginPin) return showError('PIN not set');
-    if(String(pin) !== String(user.loginPin)) return showError('Wrong PIN');
+    if(String(pin)!==String(user.loginPin)) return showError('Wrong PIN');
 
-    // Save session
+    // ✅ SAVE SESSION
     localStorage.setItem('bb_role','barber');
-    localStorage.setItem('bb_phone', cleanPhone(phone));
-    localStorage.setItem('bb_name', user.name || 'Barber');
+    localStorage.setItem('bb_phone',cleanPhone(phone));
+    localStorage.setItem('bb_name',user.name||'Barber');
 
+    // ✅ Redirect after small delay
     setTimeout(()=>{ window.location.href='app-barber.html'; },50);
 
-  }catch(err){
-    console.error(err);
-    showError('Network error');
-  }
+  } catch(err){ console.error(err); showError('Network error'); }
 }
 
 function showError(msg, show=true){
-  const el = document.getElementById('errMsg');
+  const el=document.getElementById('errMsg');
   if(!el) return;
-  el.style.display = show ? 'block':'none';
-  el.textContent = msg;
+  el.style.display=show?'block':'none';
+  el.textContent=msg;
 }
 
-document.addEventListener('DOMContentLoaded', ()=>{ 
-  document.getElementById('loginBtn')?.addEventListener('click', doLogin);
+// ✅ Auto login if already logged in
+document.addEventListener('DOMContentLoaded',()=>{
+  if(localStorage.getItem('bb_role')==='barber'){
+    window.location.href='app-barber.html';
+  }
+  document.getElementById('loginBtn')?.addEventListener('click',doLogin);
 });
-document.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
 </script>
 </body>
 </html>
