@@ -64,103 +64,100 @@ input::placeholder{color:#AAAAAA}
 </div>
 
 <script>
-var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ✅ CLEAN PHONE FUNCTION
 function cleanPhone(p){
-  return String(p).replace(/\D/g, '');
+  return String(p || '').replace(/\D/g, '');
 }
 
-// ✅ LOGIN FUNCTION (DIRECT GOOGLE SHEET)
 async function doLogin() {
 
-  var phone = document.getElementById('phoneInput')?.value.trim();
-  var pin   = document.getElementById('pinInput')?.value.trim();
-  var errEl = document.getElementById('errMsg');
+  const phone = document.getElementById('phoneInput')?.value.trim();
+  const pin   = document.getElementById('pinInput')?.value.trim();
+  const errEl = document.getElementById('errMsg');
 
   if (!phone || cleanPhone(phone).length < 10) {
-    errEl.textContent = 'Enter valid phone';
-    errEl.style.display = 'block';
-    return;
+    return showError('Enter valid phone');
   }
 
   if (!pin || pin.length < 4) {
-    errEl.textContent = 'Enter 4-digit PIN';
-    errEl.style.display = 'block';
-    return;
+    return showError('Enter 4-digit PIN');
   }
 
-  errEl.textContent = 'Checking...';
-  errEl.style.display = 'block';
+  showError('Checking...', true);
 
   try {
-    // ✅ FETCH FROM GOOGLE SHEET
-    let res = await fetch(SHEET_URL + '?t=' + Date.now());
-    let text = await res.text();
+    const res = await fetch(SHEET_URL + '?t=' + Date.now());
+    const text = await res.text();
 
-    let data;
+    let response;
+
     try {
-      data = JSON.parse(text);
+      response = JSON.parse(text);
     } catch(e) {
-      errEl.textContent = 'Server error. Try again.';
-      return;
+      console.error("RAW:", text);
+      return showError('Server error');
     }
+
+    // ✅ 🔥 FIX FOR YOUR API
+    let data = Array.isArray(response) ? response : response.data;
 
     if (!Array.isArray(data)) {
-      errEl.textContent = 'Invalid data format';
-      return;
+      console.error("FORMAT:", response);
+      return showError('Invalid data format');
     }
 
-    // ✅ FIND BARBER
-    var sm = data.find(u =>
+    const user = data.find(u =>
       cleanPhone(u.phone) === cleanPhone(phone) &&
-      String(u.role).toLowerCase().trim() === 'barber'
+      String(u.role || '').toLowerCase().trim() === 'barber'
     );
 
-    if (!sm) {
-      errEl.textContent = 'Not registered';
-      return;
+    if (!user) {
+      return showError('Not registered');
     }
 
-    // ❌ NO DEFAULT PIN — MUST EXIST
-    if (!sm.loginPin) {
-      errEl.textContent = 'PIN not set. Contact admin.';
-      return;
+    if (!user.loginPin) {
+      return showError('PIN not set. Contact admin.');
     }
 
-    var storedPin = String(sm.loginPin).trim();
-
-    if (String(pin) !== storedPin) {
-      errEl.textContent = 'Wrong PIN';
-      return;
+    if (String(pin) !== String(user.loginPin).trim()) {
+      return showError('Wrong PIN');
     }
 
-    // ✅ SUCCESS LOGIN
+    // ✅ SUCCESS
     localStorage.setItem('bb_role', 'barber');
     localStorage.setItem('bb_phone', cleanPhone(phone));
-    localStorage.setItem('bb_name', sm.name || 'Barber');
+    localStorage.setItem('bb_name', user.name || 'Barber');
 
-    errEl.style.display = 'none';
+    showError('', false);
 
     window.location.href = 'app-barber.html';
 
-  } catch (e) {
-    console.error(e);
-    errEl.textContent = 'Network error. Check internet.';
+  } catch (err) {
+    console.error(err);
+    showError('Network error');
   }
 }
 
-// ✅ BUTTON CLICK (MOBILE SAFE)
+function showError(msg, show = true){
+  const errEl = document.getElementById('errMsg');
+  if (!errEl) return;
+
+  if (show) {
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+  } else {
+    errEl.style.display = 'none';
+  }
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   const btn = document.getElementById("loginBtn");
-  if (btn) {
-    btn.addEventListener("click", doLogin);
-  }
+  if (btn) btn.addEventListener("click", doLogin);
 });
 
-// ✅ ENTER KEY SUPPORT
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') doLogin();
+document.addEventListener("keydown", function(e){
+  if (e.key === "Enter") doLogin();
 });
 </script>
   
