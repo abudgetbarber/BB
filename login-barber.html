@@ -56,17 +56,18 @@ input:focus{border-color:#004F38}
 
   <div class="fg">
     <label>Mobile Number</label>
-    <input type="tel" id="phoneInput" maxlength="10" placeholder="10-digit number"
-    oninput="this.value=this.value.replace(/\D/g,'')">
+    <input type="tel" id="phoneInput" maxlength="10"
+      placeholder="10-digit number"
+      oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
 
   <div class="fg">
     <label>PIN</label>
-    <input type="password" id="pinInput" maxlength="4" placeholder="4-digit PIN"
-    oninput="this.value=this.value.replace(/\D/g,'')">
+    <input type="password" id="pinInput" maxlength="4"
+      placeholder="4-digit PIN"
+      oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
 
-  <!-- ✅ SINGLE BUTTON SET -->
   <button class="btn btn-primary" onclick="loginBarber()">Login →</button>
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 
@@ -74,10 +75,9 @@ input:focus{border-color:#004F38}
 
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
-
 const DEBUG = true;
 
-// Prevent double load
+// Prevent duplicate script execution
 if(window.__bb_loaded){
   console.warn("Already loaded");
 } else {
@@ -96,7 +96,7 @@ function logDebug(...args){
         dbg = document.createElement('div');
         dbg.id = 'debugBox';
         dbg.style = "margin-top:20px;font-size:11px;background:#111;color:#0f0;padding:10px;border-radius:8px;max-height:200px;overflow:auto;";
-        document.body.appendChild(dbg); // ✅ FIXED (no duplication)
+        document.body.appendChild(dbg);
     }
 
     dbg.innerHTML += args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + "<br>";
@@ -126,14 +126,28 @@ function loginBarber(){
         return showError("Invalid PIN");
     }
 
-    fetch(SHEET_URL)
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 8000);
+
+    fetch(SHEET_URL, { signal: controller.signal })
     .then(res => {
         logDebug("Status:", res.status);
-        return res.json();
+        return res.text();
     })
-    .then(data => {
+    .then(text => {
 
-        logDebug("Raw:", data);
+        logDebug("Raw Text:", text);
+
+        let data;
+        try{
+            data = JSON.parse(text);
+        }catch(e){
+            throw new Error("Invalid JSON response");
+        }
+
+        if(data.error){
+            throw new Error(data.message || "Backend error");
+        }
 
         let staff = [];
 
@@ -152,7 +166,7 @@ function loginBarber(){
             }
         }
         else{
-            throw new Error("Unknown format");
+            throw new Error("Unknown data format");
         }
 
         logDebug("Staff:", staff);
@@ -183,7 +197,12 @@ function loginBarber(){
     })
     .catch(err => {
         logDebug("ERROR:", err.message);
-        showError("Connection error");
+
+        if(err.name === 'AbortError'){
+            showError("Request timeout. Try again.");
+        } else {
+            showError("Connection error");
+        }
     });
 }
 
@@ -191,10 +210,10 @@ function showError(msg){
     const errEl = document.getElementById('errMsg');
     errEl.textContent = msg;
     errEl.style.display = 'block';
-    logDebug("Error:", msg);
+    logDebug("Error shown:", msg);
 }
 
-// Enter key
+// Enter key support
 document.addEventListener('keydown', e=>{
     if(e.key === 'Enter') loginBarber();
 });
