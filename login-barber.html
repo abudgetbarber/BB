@@ -71,30 +71,61 @@ function doLogin() {
   var phone = document.getElementById('phoneInput').value.trim();
   var pin   = document.getElementById('pinInput').value.trim();
   var errEl = document.getElementById('errMsg');
-  if(phone.length < 10){ errEl.textContent='Enter a valid phone number'; errEl.style.display='block'; return; }
-  if(pin.length < 4){   errEl.textContent='Enter your 4-digit PIN';    errEl.style.display='block'; return; }
-  errEl.style.display = 'none';
-  try {
-  var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
-  log('Checking against ' + staffList.length + ' staff records', '#333');
-  var sm = staffList.find(function(u){ return u.phone===phone && u.role==='barber'; });
-  if(!sm){
-    log('❌ No barber found with phone: ' + phone, 'red');
-    log('Available phones: ' + staffList.map(function(u){return u.phone;}).join(', '), 'orange');
-    errEl.textContent='Phone not registered as Barber — contact admin';
-    errEl.style.display='block'; return;
-  }
-  log('Found: ' + sm.name + ' role=' + sm.role + ' PIN type:' + typeof sm.loginPin, 'green');
-  if( String(pin)!== String(sm.loginPin)){
-    log('❌ PIN mismatch. Stored:' + JSON.stringify(sm.loginPin) + ' Entered:' + JSON.stringify(pin), 'red');
-    errEl.textContent='Wrong PIN. Try again.';
+
+  if(phone.length < 10){
+    errEl.textContent='Enter a valid phone number';
     errEl.style.display='block';
-    document.getElementById('pinInput').value=''; return;
-  }} catch (e) {}  
+    return;
+  }
+
+  if(pin.length < 4){
+    errEl.textContent='Enter your 4-digit PIN';
+    errEl.style.display='block';
+    return;
+  }
+
+  errEl.style.display = 'none';
+
+  try {
+    var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
+
+    log('Checking against ' + staffList.length + ' staff records', '#333');
+
+    var sm = staffList.find(function(u){
+      return u.phone === phone && u.role === 'barber';
+    });
+
+    if(!sm){
+      log('❌ No barber found with phone: ' + phone, 'red');
+      errEl.textContent='Phone not registered as Barber — contact admin';
+      errEl.style.display='block';
+      return;
+    }
+
+    log('Found: ' + sm.name + ' role=' + sm.role, 'green');
+
+    // ✅ FIXED PIN CHECK
+    if (String(pin) !== String(sm.loginPin)) {
+      log('❌ PIN mismatch. Stored:' + JSON.stringify(sm.loginPin) + ' Entered:' + JSON.stringify(pin), 'red');
+      errEl.textContent='Wrong PIN. Try again.';
+      errEl.style.display='block';
+      document.getElementById('pinInput').value='';
+      return;
+    }
+
+  } catch (e) {
+    console.error(e);
+    errEl.textContent='Something went wrong';
+    errEl.style.display='block';
+    return;
+  }
+
   log('✅ Login success!', 'green');
+
   sessionStorage.setItem('bb_role','barber');
   sessionStorage.setItem('bb_phone', phone);
-  sessionStorage.setItem('bb_name', sm.name||'Barber');
+  sessionStorage.setItem('bb_name', sm.name || 'Barber');
+
   window.location.href = 'app-barber.html';
 }
 
