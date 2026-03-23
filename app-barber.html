@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Budget Barber – Barber</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script>
+// ✅ Check session immediately
+const role = localStorage.getItem('bb_role');
+if(role !== 'barber'){
+    window.location.href = 'login.html';
+}
+</script>
+  
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <style>
 :root{
@@ -1712,6 +1720,12 @@ function hideSyncPill(){var p=document.getElementById('syncPill');if(p){p.classN
 function toast(msg){var t=document.getElementById('toastEl');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(function(){t.style.display='none';},3000);}
 function logout(){stopQRScan();sessionStorage.clear();window.location.href='index.html';}
 </script>
+
+  <script>
+// ✅ Display name from session
+document.getElementById('barberName').textContent = localStorage.getItem('bb_name') || 'Barber';
+</script>
+  
 </div><!-- /app-content -->
 </body>
 </html>
