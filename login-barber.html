@@ -6,7 +6,6 @@
 <title>Budget Barber – Barber Login</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-/* Same CSS as before */
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Barlow',sans-serif;background:#F0F0EA;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px}
 .card{background:white;border-radius:16px;padding:32px 24px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.10);border:1px solid #E0E0D8}
@@ -32,6 +31,7 @@ input::placeholder{color:#AAAAAA}
 </style>
 </head>
 <body>
+
 <div class="card">
   <div class="logo-wrap">
     <div class="logo-box"><span class="logo-text">BB</span></div>
@@ -43,22 +43,30 @@ input::placeholder{color:#AAAAAA}
   <h2>Barber Portal</h2>
   <p class="sub">Enter your phone number and 4-digit PIN</p>
   <div id="errMsg" class="err"></div>
+
   <div class="fg">
     <label for="phoneInput">Mobile Number</label>
     <input type="tel" id="phoneInput" placeholder="Your 10-digit mobile number" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
+
   <div class="fg">
     <label for="pinInput">PIN</label>
     <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
+
   <button class="btn btn-primary" id="loginBtn">Login</button>
 </div>
 
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
+// ✅ Check if user already logged in
+if(localStorage.getItem('bb_role') === 'barber'){
+  window.location.href = 'app-barber.html';
+}
+
 function cleanPhone(p){
-  return String(p || '').replace(/\D/g, '').slice(-10);
+  return String(p||'').replace(/\D/g,'').slice(-10);
 }
 
 function showError(msg, show = true){
@@ -80,12 +88,12 @@ async function doLogin() {
     const res = await fetch(SHEET_URL + '?t=' + Date.now());
     const dataRaw = await res.json();
 
-    if(!dataRaw || !dataRaw.data || !Array.isArray(dataRaw.data.staff)){
+    if(!dataRaw?.data?.staff || !Array.isArray(dataRaw.data.staff)){
       console.error('Invalid data format', dataRaw);
       return showError('Server returned invalid data');
     }
 
-    // ✅ Only barbers from staff array
+    // ✅ Only barbers
     const staffList = dataRaw.data.staff.filter(u => String(u.role).toLowerCase() === 'barber');
 
     const user = staffList.find(u => cleanPhone(u.phone) === cleanPhone(phone));
@@ -99,8 +107,6 @@ async function doLogin() {
     localStorage.setItem('bb_name', user.name || 'Barber');
 
     showError('', false);
-
-    // ✅ Redirect to app page
     window.location.href = 'app-barber.html';
 
   } catch(err){
@@ -111,7 +117,8 @@ async function doLogin() {
 
 // ✅ Event listeners
 document.getElementById('loginBtn').addEventListener('click', doLogin);
-document.addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
+document.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 </script>
+
 </body>
 </html>
