@@ -65,7 +65,8 @@ input::placeholder{color:#AAAAAA}
 // Ensure Sheet URL is always set
 (function(){
   var SHEET_URL='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
-  
+  if(!localStorage.getItem('bb_sheetUrl')&&SHEET_URL)
+    localStorage.setItem('bb_sheetUrl',SHEET_URL);
 })();
 // Admin PIN — change this to your own secret 4-digit PIN
 var ADMIN_PIN = '2691';
