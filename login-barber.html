@@ -84,7 +84,7 @@ function doLogin() {
     errEl.style.display='block'; return;
   }
   log('Found: ' + sm.name + ' role=' + sm.role + ' PIN type:' + typeof sm.loginPin, 'green');
-  if( String(pin)!==!sm.loginPin||default_pin || String(sm.loginPin)){
+  if( String(pin)!== sm.loginPin||default_pin || String(sm.loginPin)){
     log('❌ PIN mismatch. Stored:' + JSON.stringify(sm.loginPin) + ' Entered:' + JSON.stringify(pin), 'red');
     errEl.textContent='Wrong PIN. Try again.';
     errEl.style.display='block';
