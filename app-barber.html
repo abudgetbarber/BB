@@ -6,11 +6,15 @@
 <title>Budget Barber – Barber</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script>
-// ✅ Check session immediately
-const role = localStorage.getItem('bb_role');
-if(role !== 'barber'){
-    window.location.href = 'login.html';
-}
+// ✅ Check session AFTER DOM loads
+document.addEventListener("DOMContentLoaded", function() {
+    const role = localStorage.getItem('bb_role');
+    if(role !== 'barber'){
+        window.location.href = 'login.html';
+    } else {
+        document.getElementById('barberName').textContent = localStorage.getItem('bb_name') || 'Barber';
+    }
+});
 </script>
   
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
