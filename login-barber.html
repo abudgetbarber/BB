@@ -156,7 +156,14 @@ function doLogin(){
     sessionStorage.setItem('bb_phone',phone);
     sessionStorage.setItem('bb_name',sm.name||'Barber');
     window.location.href='https://abudgetbarber.github.io/BB/app-barber.html';
-  }catch(e){errEl.textContent='Login error. Please try again.';errEl.style.display='block';}
+  }catch(e){
+  console.error("LOGIN ERROR:", e);
+
+  errEl.textContent = 'Error: ' + (e.message || 'Unknown error');
+  errEl.style.display = 'block';
+
+  alert("ERROR DETAILS:\n" + JSON.stringify(e));
+}
 }
 document.addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 </script>
