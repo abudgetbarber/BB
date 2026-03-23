@@ -67,34 +67,37 @@ input::placeholder{color:#AAAAAA}
 var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
 var _staffLoaded = false;
+var _staffList = [];
 var default_pin = '0000';
 
-// ✅ LOAD STAFF (MOBILE SAFE + NO CACHE)
+// ✅ LOAD STAFF FROM GOOGLE SHEET (NO localStorage)
 async function loadStaffFromSheet() {
   try {
-    let res = await fetch(SHEET_URL + '?t=' + Date.now(), {
-      method: 'GET'
-    });
-
+    let res = await fetch(SHEET_URL + '?t=' + Date.now());
     let text = await res.text();
     let data = JSON.parse(text);
 
     if (Array.isArray(data) && data.length > 0) {
-      localStorage.setItem('bb_staff', JSON.stringify(data));
+      _staffList = data;
       _staffLoaded = true;
+
+      // ✅ Optional: store in sessionStorage (not permanent)
+      sessionStorage.setItem('bb_staff_temp', JSON.stringify(data));
+
       console.log('✅ Staff loaded:', data);
     } else {
-      throw new Error('Empty data from sheet');
+      throw new Error('Empty data');
     }
 
   } catch (e) {
     console.error('❌ Load failed:', e);
 
-    // ✅ OFFLINE FALLBACK
-    let cached = JSON.parse(localStorage.getItem('bb_staff') || '[]');
+    // ✅ Fallback: try sessionStorage
+    let cached = JSON.parse(sessionStorage.getItem('bb_staff_temp') || '[]');
     if (cached.length > 0) {
+      _staffList = cached;
       _staffLoaded = true;
-      console.log('⚠️ Using cached staff data');
+      console.log('⚠️ Using session cached data');
     }
   }
 }
@@ -117,25 +120,22 @@ function doLogin() {
     return;
   }
 
-  // 🚨 WAIT UNTIL DATA LOADS
   if (!_staffLoaded) {
     errEl.textContent = 'Loading staff data, please wait...';
     errEl.style.display = 'block';
     return;
   }
 
-  errEl.style.display = 'none';
-
-  var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
-
-  if (!staffList.length) {
+  if (!_staffList.length) {
     errEl.textContent = 'No staff data available. Check internet.';
     errEl.style.display = 'block';
     return;
   }
 
-  // ✅ SAFE MATCH (PHONE + ROLE)
-  var sm = staffList.find(function(u) {
+  errEl.style.display = 'none';
+
+  // ✅ SAFE MATCH
+  var sm = _staffList.find(function(u) {
     return String(u.phone) === String(phone) &&
            String(u.role).toLowerCase() === 'barber';
   });
@@ -146,7 +146,7 @@ function doLogin() {
     return;
   }
 
-  // ✅ SAFE PIN (WITH DEFAULT)
+  // ✅ PIN CHECK WITH DEFAULT
   var storedPin = sm.loginPin ? String(sm.loginPin) : default_pin;
 
   if (String(pin) !== storedPin) {
@@ -156,9 +156,7 @@ function doLogin() {
     return;
   }
 
-  // ✅ SUCCESS
-  console.log('✅ Login success:', sm);
-
+  // ✅ SUCCESS (only sessionStorage for login session)
   sessionStorage.setItem('bb_role', 'barber');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', sm.name || 'Barber');
@@ -166,7 +164,7 @@ function doLogin() {
   window.location.href = 'app-barber.html';
 }
 
-// ✅ LOAD DATA ON PAGE LOAD
+// ✅ LOAD ON PAGE START
 window.addEventListener('load', function() {
   loadStaffFromSheet();
 });
@@ -177,7 +175,7 @@ document.addEventListener('keydown', function(e) {
     doLogin();
   }
 });
-</script>
+</script>  
   
 </body>
 </html>
