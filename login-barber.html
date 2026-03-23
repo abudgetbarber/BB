@@ -147,7 +147,7 @@ function doLogin() {
   var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
   log('Checking against ' + staffList.length + ' staff records', '#333');
   var sm = staffList.find(function(u){ return u.phone===phone && u.role==='barber'; });
-  var sm.loginpin = '0000';
+  var default_pin = '0000';
   if(!sm){
     log('❌ No barber found with phone: ' + phone, 'red');
     log('Available phones: ' + staffList.map(function(u){return u.phone;}).join(', '), 'orange');
@@ -155,7 +155,7 @@ function doLogin() {
     errEl.style.display='block'; return;
   }
   log('Found: ' + sm.name + ' role=' + sm.role + ' PIN type:' + typeof sm.loginPin, 'green');
-  if(!sm.loginPin || String(sm.loginPin) !== String(pin)){
+  if(!sm.loginPin||default_pin || String(sm.loginPin) !== String(pin)){
     log('❌ PIN mismatch. Stored:' + JSON.stringify(sm.loginPin) + ' Entered:' + JSON.stringify(pin), 'red');
     errEl.textContent='Wrong PIN. Try again.';
     errEl.style.display='block';
