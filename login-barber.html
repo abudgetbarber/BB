@@ -63,15 +63,14 @@ input::placeholder{color:#AAAAAA}
 </div>
 
 <script>
-// Using your provided Google Apps Script Web App URL
+// Web App URL
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// Auto redirect if already logged in
+// Auto redirect if logged in
 if(sessionStorage.getItem('bb_role') === 'barber'){
     window.location.href = 'app-barber.html';
 }
 
-// Login function
 function loginBarber(){
     const errEl = document.getElementById('errMsg');
     errEl.style.display = 'none';
@@ -79,7 +78,6 @@ function loginBarber(){
     const phone = document.getElementById('phoneInput').value.trim();
     const pin = document.getElementById('pinInput').value.trim();
 
-    // Validate inputs
     if(!/^\d{10}$/.test(phone)){
         errEl.textContent = 'Enter a valid 10-digit phone number';
         errEl.style.display = 'block';
@@ -91,16 +89,27 @@ function loginBarber(){
         return;
     }
 
-    // Fetch barbers from Google Sheet
+    // Fetch barbers
     fetch(SHEET_URL)
     .then(res => res.json())
-    .then(barbers => {
-        if(!Array.isArray(barbers)){
-            throw new Error('Invalid data format from sheet');
+    .then(data => {
+        if(data.error){
+            throw new Error('Sheet missing or invalid headers: ' + data.error);
+        }
+        if(!Array.isArray(data) || data.length===0){
+            throw new Error('No barber data found in Staff sheet');
         }
 
-        const user = barbers.find(u => u.phone === phone && u.role.toLowerCase() === 'barber');
+        // Check headers
+        const requiredHeaders = ['phone','role','loginPin','name'];
+        const first = data[0];
+        for(let h of requiredHeaders){
+            if(!(h in first)){
+                throw new Error('Missing column "'+h+'" in Staff sheet');
+            }
+        }
 
+        const user = data.find(u => u.phone === phone && u.role.toLowerCase() === 'barber');
         if(!user){
             errEl.textContent = 'Phone not registered as a Barber. Contact your manager.';
             errEl.style.display = 'block';
@@ -112,17 +121,14 @@ function loginBarber(){
             return;
         }
 
-        // Successful login
         sessionStorage.setItem('bb_role','barber');
         sessionStorage.setItem('bb_phone', phone);
         sessionStorage.setItem('bb_name', user.name || 'Barber');
-
-        // Redirect to app
         window.location.href = 'app-barber.html';
     })
     .catch(err => {
         console.error(err);
-        errEl.textContent = 'Unable to fetch staff data. Try again later.';
+        errEl.textContent = 'Unable to fetch staff data: ' + err.message;
         errEl.style.display = 'block';
     });
 }
