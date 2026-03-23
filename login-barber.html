@@ -58,27 +58,28 @@ input::placeholder{color:#AAAAAA}
     <label>PIN</label>
     <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
-  <button class="btn btn-primary" onclick="loginWithSheet()">Login →</button>
+  <button class="btn btn-primary" onclick="loginBarber()">Login →</button>
   <a href="index.html" class="btn btn-secondary">← Back to Portals</a>
 </div>
 
 <script>
+// Using your provided Google Apps Script Web App URL
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// Auto-redirect if already logged in
+// Auto redirect if already logged in
 if(sessionStorage.getItem('bb_role') === 'barber'){
     window.location.href = 'app-barber.html';
 }
 
-// Fetch staff list from Google Sheets and login
-function loginWithSheet(){
+// Login function
+function loginBarber(){
     const errEl = document.getElementById('errMsg');
     errEl.style.display = 'none';
 
     const phone = document.getElementById('phoneInput').value.trim();
     const pin = document.getElementById('pinInput').value.trim();
 
-    // Input validation
+    // Validate inputs
     if(!/^\d{10}$/.test(phone)){
         errEl.textContent = 'Enter a valid 10-digit phone number';
         errEl.style.display = 'block';
@@ -90,14 +91,16 @@ function loginWithSheet(){
         return;
     }
 
-    // Fetch staff data directly
+    // Fetch barbers from Google Sheet
     fetch(SHEET_URL)
     .then(res => res.json())
-    .then(staffList => {
-        if(!Array.isArray(staffList)){
-            throw new Error('Invalid data format from Google Sheet');
+    .then(barbers => {
+        if(!Array.isArray(barbers)){
+            throw new Error('Invalid data format from sheet');
         }
-        const user = staffList.find(u => u.phone === phone && u.role === 'barber');
+
+        const user = barbers.find(u => u.phone === phone && u.role.toLowerCase() === 'barber');
+
         if(!user){
             errEl.textContent = 'Phone not registered as a Barber. Contact your manager.';
             errEl.style.display = 'block';
@@ -114,6 +117,7 @@ function loginWithSheet(){
         sessionStorage.setItem('bb_phone', phone);
         sessionStorage.setItem('bb_name', user.name || 'Barber');
 
+        // Redirect to app
         window.location.href = 'app-barber.html';
     })
     .catch(err => {
@@ -124,7 +128,7 @@ function loginWithSheet(){
 }
 
 // Enter key support
-document.addEventListener('keydown', e => { if(e.key === 'Enter') loginWithSheet(); });
+document.addEventListener('keydown', e => { if(e.key === 'Enter') loginBarber(); });
 </script>
 </body>
 </html>
