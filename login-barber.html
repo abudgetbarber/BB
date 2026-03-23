@@ -43,7 +43,7 @@ input::placeholder{color:#AAAAAA}
   </div>
   <h2>Barber Portal</h2>
   <p class="sub">Enter your phone number and 4-digit PIN</p>
-  <div id="errMsg" class="err"></div>
+  <div id="errMsg" class="err">Wrong phone or PIN. Please try again.</div>
   <div class="fg">
     <label for="phoneInput">Mobile Number</label>
     <input type="tel" id="phoneInput" placeholder="Your 10-digit mobile number" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
@@ -58,56 +58,63 @@ input::placeholder{color:#AAAAAA}
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
+// Normalize phone (last 10 digits)
 function cleanPhone(p){
-  return String(p || '').replace(/\D/g,'').slice(-10);
+  const digits = String(p||'').replace(/\D/g,'');
+  return digits.slice(-10);
 }
 
-function showError(msg, show=true){
-  const el = document.getElementById('errMsg');
-  if(!el) return;
-  el.style.display = show ? 'block' : 'none';
-  el.textContent = msg;
-}
-
-async function doLogin(){
-  const phone = document.getElementById('phoneInput').value.trim();
-  const pin   = document.getElementById('pinInput').value.trim();
+async function doLogin() {
+  const phone = document.getElementById('phoneInput')?.value.trim();
+  const pin = document.getElementById('pinInput')?.value.trim();
 
   if(!phone || cleanPhone(phone).length < 10) return showError('Enter valid phone');
   if(!pin || pin.length < 4) return showError('Enter 4-digit PIN');
 
   showError('Checking...', true);
 
-  try {
+  try{
     const res = await fetch(SHEET_URL + '?t=' + Date.now());
-    const json = await res.json();
+    const text = await res.text();
+    let data;
 
-    if(!json || !json.data || !Array.isArray(json.data.staff)) 
-      return showError('Invalid data format');
+    try{ data = JSON.parse(text); } 
+    catch(e){ return showError('Server not returning JSON'); }
 
-    const staffList = json.data.staff.filter(u => String(u.role || '').toLowerCase() === 'barber');
+    if(!Array.isArray(data)) {
+      if(Array.isArray(data.staff)) data = data.staff;
+      else return showError('Invalid data format');
+    }
 
-    const user = staffList.find(u => cleanPhone(u.phone) === cleanPhone(phone));
+    const user = data.find(u => String(u.role).toLowerCase() === 'barber' && cleanPhone(u.phone) === cleanPhone(phone));
     if(!user) return showError('Staff not registered');
     if(!user.loginPin) return showError('PIN not set');
-    if(String(user.loginPin).trim() !== pin.trim()) return showError('Wrong PIN');
+    if(String(pin) !== String(user.loginPin)) return showError('Wrong PIN');
 
-    // ✅ Save session
+    // Save session
     localStorage.setItem('bb_role','barber');
     localStorage.setItem('bb_phone', cleanPhone(phone));
     localStorage.setItem('bb_name', user.name || 'Barber');
 
-    // ✅ Redirect to barber app
-    window.location.href = 'app-barber.html';
+    setTimeout(()=>{ window.location.href='app-barber.html'; },50);
 
-  } catch(err){
+  }catch(err){
     console.error(err);
     showError('Network error');
   }
 }
 
-document.getElementById('loginBtn').addEventListener('click', doLogin);
-document.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+function showError(msg, show=true){
+  const el = document.getElementById('errMsg');
+  if(!el) return;
+  el.style.display = show ? 'block':'none';
+  el.textContent = msg;
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{ 
+  document.getElementById('loginBtn')?.addEventListener('click', doLogin);
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 </script>
 </body>
 </html>
