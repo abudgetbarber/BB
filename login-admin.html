@@ -62,58 +62,65 @@ input::placeholder{color:#AAAAAA}
 </div>
 
 <script>
-// 🔥 Force clean ALL localStorage to avoid conflicts
-(function(){
-  try {
-    localStorage.clear();   // wipes any old data
-  } catch(e){}
+// 🔥 No localStorage used anywhere
+var SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-  // Always define sheet URL WITHOUT storing
-  window.SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
-})();
-
-// Admin PIN
-var ADMIN_PIN = '2691';
-
-function doLogin(){
+async function doLogin(){
   var phone = document.getElementById('phoneInput').value.trim();
   var pin   = document.getElementById('pinInput').value.trim();
   var errEl = document.getElementById('errMsg');
 
   if(phone.length < 8){
-    errEl.textContent = 'Enter a valid phone number (min 8 digits)';
+    errEl.textContent = 'Enter valid phone number';
     errEl.style.display = 'block';
-    document.getElementById('phoneInput').focus();
     return;
   }
 
   if(pin.length < 4){
-    errEl.textContent = 'Enter your 4-digit PIN';
+    errEl.textContent = 'Enter 4-digit PIN';
     errEl.style.display = 'block';
-    document.getElementById('pinInput').focus();
     return;
   }
 
-  if(pin !== ADMIN_PIN){
-    errEl.textContent = 'Wrong PIN. Please try again.';
-    errEl.style.display = 'block';
-    document.getElementById('pinInput').value = '';
-    document.getElementById('pinInput').focus();
-    return;
+  errEl.textContent = 'Checking...';
+  errEl.style.display = 'block';
+
+  try {
+    // 🔄 Fetch LIVE data
+    var res = await fetch(SHEET_URL);
+    var data = await res.json();
+
+    // 🔍 Find user
+    var user = data.find(function(u){
+      return String(u.phone) === phone && String(u.pin) === pin;
+    });
+
+    if(!user){
+      errEl.textContent = 'Invalid phone or PIN';
+      return;
+    }
+
+    // ✅ Login success
+    sessionStorage.clear();
+    sessionStorage.setItem('bb_role', user.role || 'staff');
+    sessionStorage.setItem('bb_phone', user.phone);
+    sessionStorage.setItem('bb_name', user.name || 'User');
+
+    errEl.style.display = 'none';
+
+    // 🔀 Redirect based on role
+    if(user.role === 'admin'){
+      window.location.href = 'app-admin.html';
+    } else {
+      window.location.href = 'app.html';
+    }
+
+  } catch(e){
+    errEl.textContent = 'Network error. Try again.';
   }
-
-  // ✅ Clear session before setting new
-  sessionStorage.clear();
-
-  sessionStorage.setItem('bb_role', 'admin');
-  sessionStorage.setItem('bb_phone', phone);
-  sessionStorage.setItem('bb_name', 'Admin'); // No local lookup
-
-  errEl.style.display = 'none';
-  window.location.href = 'app-admin.html';
 }
 
-// Enter key login
+// Enter key support
 document.addEventListener('keydown', function(e){
   if(e.key === 'Enter') doLogin();
 });
