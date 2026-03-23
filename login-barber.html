@@ -90,75 +90,38 @@ if(sessionStorage.getItem('bb_role') === 'barber'){
 
 function loginBarber(){
 
-    const errEl = document.getElementById('errMsg');
-    errEl.style.display = 'none';
-
     const phone = document.getElementById('phoneInput').value.trim();
-    const pin = document.getElementById('pinInput').value.trim();
+    const pin   = document.getElementById('pinInput').value.trim();
 
-    logDebug("Phone:", phone);
-    logDebug("PIN:", pin);
+    if(!/^\d{10}$/.test(phone)) return showError("Invalid phone");
+    if(!/^\d{4}$/.test(pin)) return showError("Invalid PIN");
 
-    if(!/^\d{10}$/.test(phone)){
-        return showError("Invalid phone");
-    }
+    const url = SHEET_URL + "?action=loginBarber&phone=" + phone;
 
-    if(!/^\d{4}$/.test(pin)){
-        return showError("Invalid PIN");
-    }
+    logDebug("Calling:", url);
 
-    fetch(SHEET_URL)
-    .then(res => {
-        logDebug("Status:", res.status);
-        return res.json();
-    })
+    fetch(url)
+    .then(res => res.json())
     .then(data => {
 
-        logDebug("Raw:", data);
+        logDebug("Response:", JSON.stringify(data));
 
-        let staff = [];
-
-        if(Array.isArray(data)){
-            staff = data;
-        }
-        else if(Array.isArray(data.values)){
-            const headers = data.values[0];
-
-            for(let i=1;i<data.values.length;i++){
-                let obj = {};
-                headers.forEach((h,idx)=>{
-                    obj[h.trim()] = String(data.values[i][idx]).trim();
-                });
-                staff.push(obj);
-            }
-        }
-        else{
-            throw new Error("Unknown format");
+        if(!data.ok){
+            return showError(data.message || "Login failed");
         }
 
-        logDebug("Staff:", staff);
+        const user = data.user;
 
-        const user = staff.find(u =>
-            String(u.phone).trim() === phone &&
-            String(u.role).toLowerCase().trim() === 'barber'
-        );
-
-        logDebug("User:", user);
-
-        if(!user){
-            return showError("Barber not found");
-        }
-
+        // ✅ CORRECT FIELD
         if(String(user.loginPin).trim() !== pin){
             return showError("Wrong PIN");
         }
 
-        logDebug("LOGIN SUCCESS");
-
+        // ✅ SUCCESS
         sessionStorage.clear();
         sessionStorage.setItem('bb_role','barber');
-        sessionStorage.setItem('bb_phone', phone);
-        sessionStorage.setItem('bb_name', user.name || 'Barber');
+        sessionStorage.setItem('bb_name', user.name);
+        sessionStorage.setItem('bb_id', user.id);
 
         window.location.href = 'app-barber.html';
     })
