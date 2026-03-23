@@ -27,11 +27,12 @@ input::placeholder{color:#AAAAAA}
 .btn:active{transform:scale(.97)}
 .btn-primary{background:#004F38;color:#F5E030}
 .btn-primary:hover{background:#006648}
+.btn-secondary{background:transparent;border:2px solid #E0E0D8;color:#767668;margin-top:10px}
+.btn-secondary:hover{border-color:#004F38;color:#004F38}
 .err{color:#DC2626;font-size:13px;font-weight:600;text-align:center;margin-bottom:12px;display:none}
 </style>
 </head>
 <body>
-
 <div class="card">
   <div class="logo-wrap">
     <div class="logo-box"><span class="logo-text">BB</span></div>
@@ -43,52 +44,34 @@ input::placeholder{color:#AAAAAA}
   <h2>Barber Portal</h2>
   <p class="sub">Enter your phone number and 4-digit PIN</p>
   <div id="errMsg" class="err"></div>
-
   <div class="fg">
     <label for="phoneInput">Mobile Number</label>
     <input type="tel" id="phoneInput" placeholder="Your 10-digit mobile number" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
-
   <div class="fg">
     <label for="pinInput">PIN</label>
     <input type="password" id="pinInput" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
   </div>
-
-  <button class="btn btn-primary" id="loginBtn">Login</button>
+  <button id="loginBtn" class="btn btn-primary">Login</button>
 </div>
 
 <script>
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// ✅ Check if user already logged in
-if(localStorage.getItem('bb_role') === 'barber'){
-  window.location.href = 'app-barber.html';
-}
-
-  const role = localStorage.getItem('bb_role');
-if(role !== 'barber'){
-    // Not logged in as barber, redirect to login
-    window.location.href = 'login.html';
-}
-
-// Optional: display logged-in barber name
-const name = localStorage.getItem('bb_name');
-if(name){
-    document.getElementById('barberName')?.textContent = name;
-  
 function cleanPhone(p){
-  return String(p||'').replace(/\D/g,'').slice(-10);
+  return String(p || '').replace(/\D/g,'').slice(-10);
 }
 
-function showError(msg, show = true){
+function showError(msg, show=true){
   const el = document.getElementById('errMsg');
+  if(!el) return;
   el.style.display = show ? 'block' : 'none';
   el.textContent = msg;
 }
 
-async function doLogin() {
+async function doLogin(){
   const phone = document.getElementById('phoneInput').value.trim();
-  const pin = document.getElementById('pinInput').value.trim();
+  const pin   = document.getElementById('pinInput').value.trim();
 
   if(!phone || cleanPhone(phone).length < 10) return showError('Enter valid phone');
   if(!pin || pin.length < 4) return showError('Enter 4-digit PIN');
@@ -97,27 +80,24 @@ async function doLogin() {
 
   try {
     const res = await fetch(SHEET_URL + '?t=' + Date.now());
-    const dataRaw = await res.json();
+    const json = await res.json();
 
-    if(!dataRaw?.data?.staff || !Array.isArray(dataRaw.data.staff)){
-      console.error('Invalid data format', dataRaw);
-      return showError('Server returned invalid data');
-    }
+    if(!json || !json.data || !Array.isArray(json.data.staff)) 
+      return showError('Invalid data format');
 
-    // ✅ Only barbers
-    const staffList = dataRaw.data.staff.filter(u => String(u.role).toLowerCase() === 'barber');
+    const staffList = json.data.staff.filter(u => String(u.role || '').toLowerCase() === 'barber');
 
     const user = staffList.find(u => cleanPhone(u.phone) === cleanPhone(phone));
-    if(!user) return showError('Not registered');
+    if(!user) return showError('Staff not registered');
     if(!user.loginPin) return showError('PIN not set');
-    if(String(pin).trim() !== String(user.loginPin).trim()) return showError('Wrong PIN');
+    if(String(user.loginPin).trim() !== pin.trim()) return showError('Wrong PIN');
 
     // ✅ Save session
     localStorage.setItem('bb_role','barber');
     localStorage.setItem('bb_phone', cleanPhone(phone));
     localStorage.setItem('bb_name', user.name || 'Barber');
 
-    showError('', false);
+    // ✅ Redirect to barber app
     window.location.href = 'app-barber.html';
 
   } catch(err){
@@ -126,10 +106,8 @@ async function doLogin() {
   }
 }
 
-// ✅ Event listeners
 document.getElementById('loginBtn').addEventListener('click', doLogin);
 document.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 </script>
-
 </body>
 </html>
