@@ -70,93 +70,136 @@ var _staffLoaded = false;
 var _staffList = [];
 var default_pin = '0000';
 
-// ✅ LOAD STAFF FROM GOOGLE SHEET (NO localStorage)
-async function loadStaffFromSheet() {
+var db;
+
+// ✅ INIT INDEXED DB
+function initDB() {
+  return new Promise((resolve, reject) => {
+    let request = indexedDB.open('BB_DB', 1);
+
+    request.onupgradeneeded = function(e) {
+      db = e.target.result;
+      if (!db.objectStoreNames.contains('staff')) {
+        db.createObjectStore('staff', { keyPath: 'phone' });
+      }
+    };
+
+    request.onsuccess = function(e) {
+      db = e.target.result;
+      resolve();
+    };
+
+    request.onerror = function() {
+      reject();
+    };
+  });
+}
+
+// ✅ SAVE TO DB
+function saveStaffToDB(data) {
+  let tx = db.transaction('staff', 'readwrite');
+  let store = tx.objectStore('staff');
+  store.clear();
+  data.forEach(item => store.put(item));
+}
+
+// ✅ LOAD FROM DB (OFFLINE)
+function loadStaffFromDB() {
+  return new Promise((resolve) => {
+    let tx = db.transaction('staff', 'readonly');
+    let store = tx.objectStore('staff');
+    let request = store.getAll();
+
+    request.onsuccess = function() {
+      resolve(request.result || []);
+    };
+
+    request.onerror = function() {
+      resolve([]);
+    };
+  });
+}
+
+// ✅ FETCH FROM GOOGLE SHEET + SYNC
+async function syncStaff() {
   try {
     let res = await fetch(SHEET_URL + '?t=' + Date.now());
     let text = await res.text();
     let data = JSON.parse(text);
 
-    if (Array.isArray(data) && data.length > 0) {
+    if (Array.isArray(data) && data.length) {
       _staffList = data;
       _staffLoaded = true;
 
-      // ✅ Optional: store in sessionStorage (not permanent)
-      sessionStorage.setItem('bb_staff_temp', JSON.stringify(data));
-
-      console.log('✅ Staff loaded:', data);
-    } else {
-      throw new Error('Empty data');
+      saveStaffToDB(data); // save offline
+      console.log('✅ Synced from sheet');
     }
 
   } catch (e) {
-    console.error('❌ Load failed:', e);
-
-    // ✅ Fallback: try sessionStorage
-    let cached = JSON.parse(sessionStorage.getItem('bb_staff_temp') || '[]');
-    if (cached.length > 0) {
-      _staffList = cached;
-      _staffLoaded = true;
-      console.log('⚠️ Using session cached data');
-    }
+    console.warn('⚠️ Sync failed, using offline data');
   }
 }
 
-// ✅ LOGIN FUNCTION
+// ✅ INITIAL LOAD (OFFLINE FIRST)
+async function initApp() {
+  await initDB();
+
+  // 1. Load offline first
+  let offlineData = await loadStaffFromDB();
+  if (offlineData.length) {
+    _staffList = offlineData;
+    _staffLoaded = true;
+    console.log('⚡ Loaded from offline DB');
+  }
+
+  // 2. Then sync online (background)
+  syncStaff();
+}
+
+// ✅ LOGIN
 function doLogin() {
   var phone = document.getElementById('phoneInput').value.trim();
   var pin   = document.getElementById('pinInput').value.trim();
   var errEl = document.getElementById('errMsg');
 
   if (phone.length < 10) {
-    errEl.textContent = 'Enter a valid phone number';
+    errEl.textContent = 'Enter valid phone';
     errEl.style.display = 'block';
     return;
   }
 
   if (pin.length < 4) {
-    errEl.textContent = 'Enter your 4-digit PIN';
+    errEl.textContent = 'Enter 4-digit PIN';
     errEl.style.display = 'block';
     return;
   }
 
   if (!_staffLoaded) {
-    errEl.textContent = 'Loading staff data, please wait...';
+    errEl.textContent = 'Loading data...';
     errEl.style.display = 'block';
     return;
   }
 
-  if (!_staffList.length) {
-    errEl.textContent = 'No staff data available. Check internet.';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  errEl.style.display = 'none';
-
-  // ✅ SAFE MATCH
-  var sm = _staffList.find(function(u) {
-    return String(u.phone) === String(phone) &&
-           String(u.role).toLowerCase() === 'barber';
-  });
+  var sm = _staffList.find(u =>
+    String(u.phone) === String(phone) &&
+    String(u.role).toLowerCase() === 'barber'
+  );
 
   if (!sm) {
-    errEl.textContent = 'Phone not registered as Barber — contact admin';
+    errEl.textContent = 'Not registered';
     errEl.style.display = 'block';
     return;
   }
 
-  // ✅ PIN CHECK WITH DEFAULT
   var storedPin = sm.loginPin ? String(sm.loginPin) : default_pin;
 
   if (String(pin) !== storedPin) {
-    errEl.textContent = 'Wrong PIN. Try again.';
+    errEl.textContent = 'Wrong PIN';
     errEl.style.display = 'block';
-    document.getElementById('pinInput').value = '';
     return;
   }
 
-  // ✅ SUCCESS (only sessionStorage for login session)
+  // ✅ SUCCESS
   sessionStorage.setItem('bb_role', 'barber');
   sessionStorage.setItem('bb_phone', phone);
   sessionStorage.setItem('bb_name', sm.name || 'Barber');
@@ -164,18 +207,16 @@ function doLogin() {
   window.location.href = 'app-barber.html';
 }
 
-// ✅ LOAD ON PAGE START
+// ✅ START APP
 window.addEventListener('load', function() {
-  loadStaffFromSheet();
+  initApp();
 });
 
-// ✅ ENTER KEY SUPPORT
+// ✅ ENTER KEY
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !document.getElementById('loginBtn').disabled) {
-    doLogin();
-  }
+  if (e.key === 'Enter') doLogin();
 });
-</script>  
+</script>
   
 </body>
 </html>
