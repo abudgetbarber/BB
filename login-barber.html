@@ -107,22 +107,12 @@ function log(msg, color) {
       if(d.staff && d.staff.length) {
         // Normalise loginPin to string
         d.staff = d.staff.map(function(s) {
-          if(s.loginPin !== undefined && s.loginPin !== null) s.loginPin = String(s.loginPin);
+          if(s.loginPin!== undefined && s.loginPin!== null) s.loginPin = String(s.loginPin);
           return s;
         });
         localStorage.setItem('bb_staff', JSON.stringify(d.staff));
       }
-      if(d.customers && d.customers.length) {
-        d.customers = d.customers.map(function(c) {
-          if(c.loginPin !== undefined && c.loginPin !== null) c.loginPin = String(c.loginPin);
-          return c;
-        });
-        localStorage.setItem('bb_customers', JSON.stringify(d.customers));
-      }
-      if(d.salons && d.salons.length) localStorage.setItem('bb_salons', JSON.stringify(d.salons));
-      localStorage.setItem('bb_sheetUrl', SHEET_URL);
-      _staffLoaded = staffCount > 0;
-    } else {
+      else {
       log('⚠ No data in response', 'orange');
     }
     enableLogin();
@@ -151,7 +141,7 @@ function doLogin() {
   var phone = document.getElementById('phoneInput').value.trim();
   var pin   = document.getElementById('pinInput').value.trim();
   var errEl = document.getElementById('errMsg');
-  if(phone.length < 8){ errEl.textContent='Enter a valid phone number'; errEl.style.display='block'; return; }
+  if(phone.length < 10){ errEl.textContent='Enter a valid phone number'; errEl.style.display='block'; return; }
   if(pin.length < 4){   errEl.textContent='Enter your 4-digit PIN';    errEl.style.display='block'; return; }
   errEl.style.display = 'none';
   var staffList = JSON.parse(localStorage.getItem('bb_staff') || '[]');
