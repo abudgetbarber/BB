@@ -6,6 +6,7 @@
 <title>Budget Barber – Barber Login</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
+/* Same CSS as before */
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Barlow',sans-serif;background:#F0F0EA;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px}
 .card{background:white;border-radius:16px;padding:32px 24px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.10);border:1px solid #E0E0D8}
@@ -27,8 +28,6 @@ input::placeholder{color:#AAAAAA}
 .btn:active{transform:scale(.97)}
 .btn-primary{background:#004F38;color:#F5E030}
 .btn-primary:hover{background:#006648}
-.btn-secondary{background:transparent;border:2px solid #E0E0D8;color:#767668;margin-top:10px}
-.btn-secondary:hover{border-color:#004F38;color:#004F38}
 .err{color:#DC2626;font-size:13px;font-weight:600;text-align:center;margin-bottom:12px;display:none}
 </style>
 </head>
@@ -43,7 +42,7 @@ input::placeholder{color:#AAAAAA}
   </div>
   <h2>Barber Portal</h2>
   <p class="sub">Enter your phone number and 4-digit PIN</p>
-  <div id="errMsg" class="err">Wrong phone or PIN. Please try again.</div>
+  <div id="errMsg" class="err"></div>
   <div class="fg">
     <label for="phoneInput">Mobile Number</label>
     <input type="tel" id="phoneInput" placeholder="Your 10-digit mobile number" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'')">
@@ -59,47 +58,52 @@ input::placeholder{color:#AAAAAA}
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
 function cleanPhone(p){
-  return String(p||'').replace(/\D/g,'').slice(-10);
+  return String(p || '').replace(/\D/g, '').slice(-10);
 }
 
-function showError(msg, show=true){
+function showError(msg, show = true){
   const el = document.getElementById('errMsg');
   el.style.display = show ? 'block' : 'none';
   el.textContent = msg;
 }
 
-async function doLogin(){
+async function doLogin() {
   const phone = document.getElementById('phoneInput').value.trim();
   const pin = document.getElementById('pinInput').value.trim();
 
-  if(!phone || cleanPhone(phone).length<10) return showError('Enter valid phone');
-  if(!pin || pin.length<4) return showError('Enter 4-digit PIN');
+  if(!phone || cleanPhone(phone).length < 10) return showError('Enter valid phone');
+  if(!pin || pin.length < 4) return showError('Enter 4-digit PIN');
 
   showError('Checking...', true);
 
-  try{
-    const res = await fetch(SHEET_URL+'?t='+Date.now());
-    const text = await res.text();
-    const parsed = JSON.parse(text);
+  try {
+    const res = await fetch(SHEET_URL + '?t=' + Date.now());
+    const dataRaw = await res.json();
 
-    // ✅ Access staff array
-    const staffList = Array.isArray(parsed?.data?.staff) ? parsed.data.staff : [];
-    if(!staffList.length) return showError('No staff data found');
+    if(!dataRaw || !dataRaw.data || !Array.isArray(dataRaw.data.staff)){
+      console.error('Invalid data format', dataRaw);
+      return showError('Server returned invalid data');
+    }
 
-    const user = staffList.find(u => cleanPhone(u.phone)===cleanPhone(phone));
-    if(!user) return showError('Staff not registered');
+    // ✅ Only barbers from staff array
+    const staffList = dataRaw.data.staff.filter(u => String(u.role).toLowerCase() === 'barber');
+
+    const user = staffList.find(u => cleanPhone(u.phone) === cleanPhone(phone));
+    if(!user) return showError('Not registered');
     if(!user.loginPin) return showError('PIN not set');
-    if(String(pin).trim()!==String(user.loginPin).trim()) return showError('Wrong PIN');
+    if(String(pin).trim() !== String(user.loginPin).trim()) return showError('Wrong PIN');
 
-    // ✅ Save session before redirect
+    // ✅ Save session
     localStorage.setItem('bb_role','barber');
-    localStorage.setItem('bb_phone',cleanPhone(phone));
-    localStorage.setItem('bb_name',user.name||'Barber');
+    localStorage.setItem('bb_phone', cleanPhone(phone));
+    localStorage.setItem('bb_name', user.name || 'Barber');
 
     showError('', false);
-    window.location.replace('app-barber.html');
 
-  }catch(err){
+    // ✅ Redirect to app page
+    window.location.href = 'app-barber.html';
+
+  } catch(err){
     console.error(err);
     showError('Network error');
   }
@@ -107,15 +111,7 @@ async function doLogin(){
 
 // ✅ Event listeners
 document.getElementById('loginBtn').addEventListener('click', doLogin);
-document.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
-
-// ✅ Auto redirect if already logged in
-document.addEventListener('DOMContentLoaded', ()=>{
-  if(localStorage.bb_phone){
-    window.location.replace('app-barber.html');
-  }
-});
+document.addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
 </script>
-
 </body>
 </html>
