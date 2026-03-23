@@ -105,11 +105,6 @@ function showError(msg, show=true){
   el.textContent=msg;
 }
 
-// ✅ Auto login if already logged in
-document.addEventListener('DOMContentLoaded',()=>{
-  if(localStorage.getItem('bb_role')==='barber'){
-    window.location.href='app-barber.html';
-  }
   document.getElementById('loginBtn')?.addEventListener('click',doLogin);
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
