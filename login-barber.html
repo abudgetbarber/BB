@@ -59,60 +59,7 @@ input::placeholder{color:#AAAAAA}
 // Ensure Sheet URL is always set
 (function(){
   var SHEET_URL='https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
-  if(!localStorage.getItem('bb_sheetUrl')&&SHEET_URL)
-    localStorage.setItem('bb_sheetUrl',SHEET_URL);
 })();
-
-// Auto-fetch latest data from Google Sheets before login check
-// This ensures PINs are always current from any device
-function fetchLatestAndLogin(loginFn) {
-  var url = localStorage.getItem('bb_sheetUrl');
-  if (!url) { loginFn(); return; }
-  
-  var cbName = '_bbLogin' + Date.now();
-  var script = document.createElement('script');
-  var done = false;
-  var errEl = document.getElementById('errMsg');
-  
-  // Show loading state briefly
-  var loginBtn = document.getElementById('loginBtn');
-  if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Checking…'; }
-  
-  var timer = setTimeout(function() {
-    if (done) return; done = true;
-    delete window[cbName];
-    if (script.parentNode) document.head.removeChild(script);
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login →'; }
-    loginFn(); // timeout = proceed anyway with local data
-  }, 12000);
-  
-  window[cbName] = function(json) {
-    if (done) return; done = true;
-    clearTimeout(timer);
-    delete window[cbName];
-    if (script.parentNode) document.head.removeChild(script);
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login →'; }
-    try {
-      if (json && json.ok && json.data) {
-        var d = json.data;
-        if (d.staff      && d.staff.length)     localStorage.setItem('bb_staff',     JSON.stringify(d.staff));
-        if (d.customers  && d.customers.length)  localStorage.setItem('bb_customers', JSON.stringify(d.customers));
-        if (d.salons     && d.salons.length)     localStorage.setItem('bb_salons',    JSON.stringify(d.salons));
-      }
-    } catch(e) {}
-    loginFn();
-  };
-  
-  script.onerror = function() {
-    if (done) return; done = true;
-    clearTimeout(timer);
-    if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login →'; }
-    loginFn();
-  };
-  
-  script.src = url + '?action=read&callback=' + cbName;
-  document.head.appendChild(script);
-}
 
 function doLogin(){
   var phone=document.getElementById('phoneInput').value.trim();
