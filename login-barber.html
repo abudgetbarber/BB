@@ -155,7 +155,7 @@ function doLogin(){
     sessionStorage.setItem('bb_role','barber');
     sessionStorage.setItem('bb_phone',phone);
     sessionStorage.setItem('bb_name',sm.name||'Barber');
-    window.location.href='app-barber.html';
+    window.location.href='/BB/app-barber.html';
   }catch(e){errEl.textContent='Login error. Please try again.';errEl.style.display='block';}
 }
 document.addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
