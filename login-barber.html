@@ -63,10 +63,8 @@ input::placeholder{color:#AAAAAA}
 </div>
 
 <script>
-// Web App URL
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbygAEyBOyRP57tXYaHS5lVBH1gRMbmfM7Fw64iSBuh-J1_8WKe_3vFu5LhdsT7sKd1-GQ/exec';
 
-// Auto redirect if logged in
 if(sessionStorage.getItem('bb_role') === 'barber'){
     window.location.href = 'app-barber.html';
 }
@@ -79,45 +77,44 @@ function loginBarber(){
     const pin = document.getElementById('pinInput').value.trim();
 
     if(!/^\d{10}$/.test(phone)){
-        errEl.textContent = 'Enter a valid 10-digit phone number';
-        errEl.style.display = 'block';
+        showError('Enter a valid 10-digit phone number');
         return;
     }
     if(!/^\d{4}$/.test(pin)){
-        errEl.textContent = 'Enter a 4-digit PIN';
-        errEl.style.display = 'block';
+        showError('Enter a 4-digit PIN');
         return;
     }
 
-    // Fetch barbers
     fetch(SHEET_URL)
     .then(res => res.json())
     .then(data => {
-        if(data.error){
-            throw new Error('Sheet missing or invalid headers: ' + data.error);
-        }
-        if(!Array.isArray(data) || data.length===0){
-            throw new Error('No barber data found in Staff sheet');
-        }
+        // Convert Google Sheet JSON structure to array of objects
+        let staff = [];
 
-        // Check headers
-        const requiredHeaders = ['phone','role','loginPin','name'];
-        const first = data[0];
-        for(let h of requiredHeaders){
-            if(!(h in first)){
-                throw new Error('Missing column "'+h+'" in Staff sheet');
+        if(Array.isArray(data)){
+            staff = data; // Already an array of objects
+        } else if(Array.isArray(data.values)){
+            const rows = data.values;
+            const headers = rows[0].map(h => h.trim());
+            for(let i = 1; i < rows.length; i++){
+                const row = rows[i];
+                let obj = {};
+                headers.forEach((key,index) => obj[key] = row[index]);
+                staff.push(obj);
             }
         }
 
-        const user = data.find(u => u.phone === phone && u.role.toLowerCase() === 'barber');
+        if(staff.length === 0){
+            throw new Error('No barber data found in Staff sheet');
+        }
+
+        const user = staff.find(u => (u.phone === phone) && (u.role.toLowerCase() === 'barber'));
         if(!user){
-            errEl.textContent = 'Phone not registered as a Barber. Contact your manager.';
-            errEl.style.display = 'block';
+            showError('Phone not registered as a Barber. Contact your manager.');
             return;
         }
         if(user.loginPin !== pin){
-            errEl.textContent = 'Wrong PIN. Try again.';
-            errEl.style.display = 'block';
+            showError('Wrong PIN. Try again.');
             return;
         }
 
@@ -126,14 +123,15 @@ function loginBarber(){
         sessionStorage.setItem('bb_name', user.name || 'Barber');
         window.location.href = 'app-barber.html';
     })
-    .catch(err => {
-        console.error(err);
-        errEl.textContent = 'Unable to fetch staff data: ' + err.message;
-        errEl.style.display = 'block';
-    });
+    .catch(err => showError('Unable to fetch staff data: ' + err.message));
 }
 
-// Enter key support
+function showError(msg){
+    const errEl = document.getElementById('errMsg');
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+}
+
 document.addEventListener('keydown', e => { if(e.key === 'Enter') loginBarber(); });
 </script>
 </body>
