@@ -90,7 +90,7 @@ function doLogin() {
     errEl.textContent='Wrong PIN. Try again.';
     errEl.style.display='block';
     document.getElementById('pinInput').value=''; return;
-  }} catch (e)
+  }} catch (e) {}  
   log('✅ Login success!', 'green');
   sessionStorage.setItem('bb_role','barber');
   sessionStorage.setItem('bb_phone', phone);
