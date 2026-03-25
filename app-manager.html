@@ -1641,7 +1641,7 @@ function saveEdit(){
     var customers = LS.get('customers')||[];
     var existing  = customers.find(function(c){ return c.phone===custPhone; });
     if (!existing){
-      customers.push({id:'ce'+editingId,phone:custPhone,name:custName,role:'customer',hairType:'',faceShape:'',density:'',growthNotes:''});
+      customers.push({id:'ce'+editingId,phone:custPhone,name:custName,role:'customer',hairType:'',faceShape:'',density:'',growthNotes:'',loginOtp:''});
       LS.set('customers',customers);
     }
   }
